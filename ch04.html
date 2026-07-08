@@ -564,7 +564,27 @@ self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)</pre>
       </ul>
 
       <h3>動手感受規模：參數計算器</h3>
-      <p>拖動滑桿即時計算總參數與記憶體。preset 是書中列的四種 GPT-2 尺寸（medium 1024/24 層、large 1280/36、XL 1600/48）：</p>
+      <p>拖動滑桿即時計算總參數與記憶體。preset 是書中列的四種 GPT-2 尺寸（medium 1024/24 層、large 1280/36、XL 1600/48）。計算器用的公式如下（帶入 GPT-2 small 的數值驗算）：</p>
+      <pre><span class="c"># 記 E = emb_dim(768)、V = vocab_size(50257)、C = context_length(1024)、L = n_layers(12)</span>
+
+Token embedding      = V × E                       = 50257×768          =  38,597,376
+Positional embedding = C × E                       = 1024×768           =     786,432
+
+<span class="c"># 每個 transformer block：</span>
+  attention  = 3E²（Q,K,V，無 bias）+ (E²+E)（輸出投影含 bias）
+             = 3×768² + (768²+768)                 = 1,769,472+590,592  =   2,360,064
+  feed forward = (E·4E + 4E) + (4E·E + E)          <span class="c"># 768→3072 再 3072→768，皆含 bias</span>
+             = (768×3072+3072) + (3072×768+768)                         =   4,722,432
+  2× LayerNorm = 2×(E + E)（scale 與 shift）        = 4×768              =       3,072
+  → 每 block 小計                                                        =   7,085,568
+
+Transformer ×L       = 12 × 7,085,568                                   =  85,026,816
+Final LayerNorm      = 2E                          = 2×768              =       1,536
+<span class="k">── 到這裡的小計（＝weight tying 後的總數）                                 124,412,160</span>
+Output head（不綁時）= V × E                        = 50257×768          =  38,597,376
+<span class="k">── 全部（我們的實作）                                                     163,009,536</span>
+
+<span class="c"># 記憶體：163,009,536 × 4 bytes (float32) ≈ 621.83 MB</span></pre>
       <div class="stage">
         <div class="presets" id="presets">
           <button class="pill on" data-p="s">small · 124M</button><button class="pill" data-p="m">medium · 355M</button><button class="pill" data-p="l">large · 774M</button><button class="pill" data-p="xl">XL · 1558M</button>
