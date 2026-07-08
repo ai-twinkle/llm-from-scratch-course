@@ -414,7 +414,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1p
         var  = x.var(dim=-1, keepdim=True, unbiased=False)
         norm_x = (x - mean) / torch.sqrt(var + self.eps)
         return self.scale * norm_x + self.shift</pre>
-      <div class="note"><b>unbiased=False 的理由：</b>變異數分母用 <code class="inl">n</code> 而非 <code class="inl">n−1</code>（不做 Bessel 校正）。emb_dim=768 很大，差異可忽略；更重要的是原始 GPT-2 用 TensorFlow 實作、預設就是這樣算——設定相同，第 6 章載入 OpenAI 預訓練權重才相容。</div>
+      <div class="note"><b>unbiased=False：為什麼分母用 n 而不是 n−1？</b>統計學上從「樣本」估計母體變異數時，慣例會把分母改成 <code class="inl">n−1</code>（稱為 <span class="en">Bessel's correction</span>）：因為用樣本自己的平均當中心，會系統性低估散佈程度，除以 n−1 可以修正這個偏差；反之分母用 <code class="inl">n</code>，得到的就是所謂「有偏（<span class="en">biased</span>）」的變異數估計。這裡刻意選 n，理由有二：<b>①</b> 對 LLM 來說這個 n 是 embedding 維度（768），n 和 n−1 的差別約 0.13%，實務上可忽略；<b>②</b> 相容性才是重點——原始 GPT-2 是用 TensorFlow 實作的，其變異數預設就是除以 n；我們採一模一樣的算法，之後把 OpenAI 的預訓練權重載進來時，LayerNorm 的行為才會和那些權重當初被訓練時完全一致。</div>
     </section>
 
     <!-- ===== 4.3 ===== -->
