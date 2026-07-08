@@ -551,6 +551,18 @@ self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)</pre>
         <p style="margin-top:10px">我們的實作採「兩層各自獨立」（163M），因為經驗上訓練效果較好、現代 LLM 也多如此；tying 的好處是省記憶體。163M 個 32-bit float（每個 4 bytes）合計 <b style="color:var(--accent)">621.83 MB</b>——「小」模型的權重也相當可觀。</p>
       </div>
 
+      <div class="plain"><div class="ph">🔰 weight tying 為什麼「合理」，不只是省參數</div><p>兩層做的事互為鏡像：token embedding 把「字」查成「向量」；輸出層把「向量」變回「每個字的分數」。若共用同一份權重，第 t 個字的 logit 就等於 <b>h · e_t</b>——拿目前的表徵 h 去和每個字的 embedding 做<strong>內積（相似度）</strong>：「h 長得最像哪個字的 embedding，哪個字分數就最高」。這在語意上非常自然：同一套「字的座標系」同時負責讀入與輸出。</p></div>
+      <div class="stage">
+        <div class="controls"><span class="small">假設模型此刻的表徵 h（示意 6 維）：</span><span id="wtChips"></span></div>
+        <div class="tsr" id="wtTsr"></div>
+        <div class="stepcap" id="wtCap"></div>
+      </div>
+      <ul class="clean">
+        <li><b>省多少</b>：50257 × 768 ≈ 38.6M 個參數（float32 約 147 MB）——tying 後 163M → 124M、權重檔 622 MB → 約 475 MB。</li>
+        <li><b>代價</b>：輸入與輸出被迫共用同一套表徵，少了一份可以分工的權重。實務上兩派都有：原始 GPT-2 綁（省參數）；本書實作不綁——經驗上各自獨立的訓練表現通常略好。</li>
+        <li><b>之後會再遇到</b>：載入 OpenAI 的 GPT-2 預訓練權重時，因為官方是綁的，要把同一份 embedding 權重同時填進 tok_emb 與 out_head。</li>
+      </ul>
+
       <h3>動手感受規模：參數計算器</h3>
       <p>拖動滑桿即時計算總參數與記憶體。preset 是書中列的四種 GPT-2 尺寸（medium 1024/24 層、large 1280/36、XL 1600/48）：</p>
       <div class="stage">
@@ -1191,6 +1203,36 @@ function drawDR(){
 }
 $("#drSlider").addEventListener("input",drawDR);
 drawDR();
+
+/* ===== 4.6 weight tying：logit = h·e_t 內積 demo ===== */
+const WT_TOKS=[["Every",6109],["effort",3626],["moves",6100],["you",345],["day",1110]];
+const WT_D=6;
+const wtEmb=id=>{const r=mulberry32(id*97+13);return Array.from({length:WT_D},()=>+(r()*2-1).toFixed(2));};
+const WT_E=WT_TOKS.map(t=>wtEmb(t[1]));
+const wtDot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0);
+const WT_HS=[
+ ["h ≈ moves 的 embedding",WT_E[2].slice()],
+ ["h ≈ you 的 embedding",WT_E[3].slice()],
+ ["h 介於 moves 和 you 之間",WT_E[2].map((v,i)=>+((v+WT_E[3][i])/2).toFixed(2))]];
+let wtSel=0;
+function fmtVec(v){return "[ "+v.map(x=>(x>=0?" ":"")+x.toFixed(2)).join(", ")+" ]";}
+function renderWT(){
+  const h=WT_HS[wtSel][1];
+  const dots=WT_E.map(e=>wtDot(h,e));
+  const win=dots.indexOf(Math.max(...dots));
+  const mx=Math.max(...dots.map(Math.abs));
+  let out=`<span class="lbl"># 目前的表徵（transformer 最後輸出的向量，示意 6 維）</span>\nh = ${fmtVec(h)}\n\n<span class="lbl"># tying 後的輸出層：logit(t) = h · e_t（跟每個字的 embedding 做內積）</span>\n`;
+  WT_TOKS.forEach((t,i)=>{
+    const bar="█".repeat(Math.max(1,Math.round(Math.abs(dots[i])/mx*14)));
+    const hot=i===win;
+    out+=`e_${t[0].padEnd(7)}= ${fmtVec(WT_E[i])}  →  logit = <span class="tn ${hot?'hot':''}" style="${hot?'':'color:var(--muted)'}">${(dots[i]>=0?" ":"")+dots[i].toFixed(2)}</span> ${hot?'<b style="color:var(--accent)">'+bar+' ← argmax</b>':'<span class="pn">'+bar+'</span>'}\n`;
+  });
+  $("#wtTsr").innerHTML=out;
+  $("#wtCap").innerHTML=`h 最像 <b>${WT_TOKS[win][0]}</b> 的 embedding，所以它的 logit 最高（${dots[win].toFixed(2)}）——tying 讓「預測下一個字」變成「找出最相似的字」。${wtSel===2?"注意這個混合表徵下 moves 和 you 的分數咬得很近——模型的『猶豫』就是這樣呈現的。":""}`;
+}
+$("#wtChips").innerHTML=WT_HS.map((x,i)=>`<button class="pill ${i===0?'on':''}" data-i="${i}" style="margin-right:6px">${x[0]}</button>`).join("");
+$$("#wtChips .pill").forEach(b=>b.addEventListener("click",()=>{wtSel=+b.dataset.i;$$("#wtChips .pill").forEach(x=>x.classList.toggle("on",x===b));renderWT();}));
+renderWT();
 
 /* ===== quiz ===== */
 const quiz=[
