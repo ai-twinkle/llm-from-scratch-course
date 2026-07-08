@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>從零打造 LLM · 互動教材｜Twinkle AI</title>
+<style>
+:root{--bg:#0e100d;--surface:#171a15;--ink:#e9ece3;--muted:#9aa091;--faint:#6b7162;--line:rgba(233,236,227,.13);--accent:#e0a63a;--mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:system-ui,-apple-system,"PingFang TC","Noto Sans TC",sans-serif}
+@media(prefers-color-scheme:light){:root{--bg:#eceee8;--surface:#f7f8f4;--ink:#191d14;--muted:#5c6152;--faint:#8a8f7e;--line:rgba(24,28,21,.14);--accent:#bf7d1a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;background-image:linear-gradient(rgba(150,150,140,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(150,150,140,.05) 1px,transparent 1px);background-size:30px 30px}
+.wrap{max-width:860px;margin:0 auto;padding:0 clamp(18px,5vw,44px)}
+header{padding:76px 0 8px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin:0 0 16px}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(30px,6vw,52px);line-height:1.05;margin:0;letter-spacing:-.02em}
+.lede{font-size:16px;color:var(--muted);max-width:56ch;margin:18px 0 0}
+.card{display:block;text-decoration:none;color:inherit;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:14px;padding:24px;margin:34px 0 12px;transition:transform .15s,border-color .15s}
+.card:hover{transform:translateY(-3px);border-color:var(--accent)}
+.cnum{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.ctitle{font-family:var(--mono);font-weight:600;font-size:20px;margin-top:8px}
+.cdesc{font-size:13.5px;color:var(--muted);margin-top:8px}
+.cgo{font-family:var(--mono);font-size:12px;color:var(--accent);margin-top:14px;font-weight:600}
+.soon{opacity:.45;border-left-color:var(--line)}
+footer{font-family:var(--mono);font-size:11.5px;color:var(--faint);padding:36px 0 70px;line-height:1.9;border-top:1px solid var(--line);margin-top:28px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Twinkle AI · Interactive Labs</p>
+    <h1>從零打造 LLM<br>互動教材</h1>
+    <p class="lede">動手操作、即時計算的 LLM 教學頁——tensor 用真實數值呈現、每個概念配一個互動元件。目前先發布第 4 章，其餘章節陸續上線。</p>
+  </header>
+  <a class="card" href="ch04.html">
+    <div class="cnum">Chapter 4</div>
+    <div class="ctitle">🏗️ 從零實作一個能生成文字的 GPT 模型</div>
+    <div class="cdesc">GPT_CONFIG · LayerNorm 逐步 stepper · 梯度消失/爆炸實驗室（真實訓練 300 步）· GELU 生死線 · 前向×反向傳播 · 參數計算器 · greedy 生成模擬</div>
+    <div class="cgo">開始學習 →</div>
+  </a>
+  <div class="card soon"><div class="cnum">Chapters 1–3 · 5–7</div><div class="ctitle">陸續上線</div></div>
+  <footer>
+    Twinkle AI 社群教材 ｜ 原創互動講義，主題對應 Sebastian Raschka《Build a Large Language Model (From Scratch)》，非原文翻譯。<br>
+    頁面中的數值皆為瀏覽器即時計算。
+  </footer>
+</div>
+</body>
+</html>

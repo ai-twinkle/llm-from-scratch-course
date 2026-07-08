@@ -1,0 +1,1216 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ch4 從零實作 GPT 模型｜互動教材</title>
+<style>
+:root{
+  --accent:#bf7d1a;--accent-soft:#e6a83c;--accent-ghost:rgba(191,125,26,.12);
+  --bg:#ece9e2;--grid:rgba(30,24,12,.05);--surface:#f8f5ee;--surface-2:#eeeadf;
+  --ink:#1c1810;--muted:#5f594a;--faint:#8f8873;
+  --line:rgba(30,24,12,.14);--line-strong:rgba(30,24,12,.28);
+  --ok:#3f8a52;--bad:#c0492f;--cool:#2f6fb0;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"PingFang TC","Noto Sans TC","Segoe UI",sans-serif;
+  --maxw:1220px;--read:68ch;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e0c07;--grid:rgba(230,168,60,.06);--surface:#181309;--surface-2:#211a0e;
+  --ink:#ece5d5;--muted:#a49b84;--faint:#6f6752;--line:rgba(236,229,213,.13);--line-strong:rgba(236,229,213,.26);
+  --accent:#e0a63a;--accent-soft:#f0be55;--accent-ghost:rgba(224,166,58,.14);--cool:#6f9ede;}}
+:root[data-theme="light"]{--bg:#ece9e2;--grid:rgba(30,24,12,.05);--surface:#f8f5ee;--surface-2:#eeeadf;--ink:#1c1810;--muted:#5f594a;--faint:#8f8873;--line:rgba(30,24,12,.14);--line-strong:rgba(30,24,12,.28);--accent:#bf7d1a;--accent-soft:#e6a83c;--accent-ghost:rgba(191,125,26,.12);--cool:#2f6fb0;}
+:root[data-theme="dark"]{--bg:#0e0c07;--grid:rgba(230,168,60,.06);--surface:#181309;--surface-2:#211a0e;--ink:#ece5d5;--muted:#a49b84;--faint:#6f6752;--line:rgba(236,229,213,.13);--line-strong:rgba(236,229,213,.26);--accent:#e0a63a;--accent-soft:#f0be55;--accent-ghost:rgba(224,166,58,.14);--cool:#6f9ede;}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.68;-webkit-font-smoothing:antialiased;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:30px 30px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+a{color:var(--accent)}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:70;transition:width .1s}
+header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 88%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:52px}
+.brand{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px}.brand b{color:var(--ink)}
+.chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--accent);color:var(--accent);border-radius:2px}
+.spacer{flex:1}.tbtn{font-family:var(--mono);font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:3px;padding:5px 10px;cursor:pointer}.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+/* 全域 LLM 管線圖 */
+.map{position:sticky;top:52px;z-index:49;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:8px 0 6px}
+.map .wrap{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:none}
+.map .wrap::-webkit-scrollbar{display:none}
+.mapstage{flex:none;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);cursor:pointer;transition:.25s;white-space:nowrap}
+.mapstage .em{font-size:12px}
+.mapstage:hover{border-color:var(--accent-soft)}
+.mapstage.lit{background:var(--accent);color:#241700;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ghost)}
+.mapstage.block{border-style:dashed}
+.mapsep{flex:none;color:var(--faint);padding:0 2px;font-size:11px}
+.mapsub{font-family:var(--mono);font-size:11px;color:var(--accent);padding:3px 0 0;min-height:16px}
+.mapsub b{color:var(--ink)}
+@media(max-width:700px){.mapstage{font-size:10px;padding:4px 7px}}
+/* layout */
+.shell{display:grid;grid-template-columns:186px minmax(0,1fr);gap:40px;padding-top:28px}
+@media(max-width:960px){.shell{grid-template-columns:1fr;gap:0}}
+nav.toc{position:sticky;top:118px;align-self:start;font-family:var(--mono);font-size:12px;max-height:calc(100vh - 140px);overflow:auto}
+@media(max-width:960px){nav.toc{display:none}}
+nav.toc .lbl{color:var(--faint);letter-spacing:.14em;font-size:10px;text-transform:uppercase;margin-bottom:10px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--ink);border-color:var(--line-strong)}nav.toc a.active{color:var(--accent);border-color:var(--accent)}
+main{min-width:0}
+.hero{padding:6px 0 26px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(26px,4.6vw,42px);line-height:1.06;margin:0;letter-spacing:-.01em}
+h1 .sub{display:block;font-size:clamp(14px,2.2vw,18px);color:var(--muted);font-weight:500;margin-top:10px}
+.lede{font-size:16px;color:var(--muted);max-width:var(--read);margin:16px 0 0}
+section{padding:38px 0;border-bottom:1px solid var(--line);scroll-margin-top:132px}
+.sh{display:flex;align-items:baseline;gap:12px;margin:0 0 4px}
+.sh .num{font-family:var(--mono);color:var(--accent);font-size:13px;font-weight:600}
+h2{font-family:var(--mono);font-weight:600;font-size:clamp(18px,2.8vw,24px);margin:0;letter-spacing:-.01em}
+h3{font-family:var(--mono);font-size:15px;margin:28px 0 8px;font-weight:600;color:var(--ink)}
+p{max-width:var(--read);margin:12px 0;color:var(--muted)}p strong,li strong{color:var(--ink)}
+.en{font-family:var(--mono);font-size:.92em;color:var(--accent);font-weight:600}
+ul.clean{max-width:var(--read);padding-left:0;list-style:none;margin:14px 0}ul.clean li{position:relative;padding-left:20px;margin:8px 0;color:var(--muted)}
+ul.clean li::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+.plain{max-width:var(--read);background:var(--accent-ghost);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 16px;margin:16px 0;font-size:14.5px;color:var(--ink)}
+.plain .ph{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent);font-weight:700;margin-bottom:5px}
+.plain p{margin:6px 0 0;color:var(--ink);max-width:none}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.small{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+canvas{display:block;width:100%;height:auto}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:14px 0}
+pre .c{color:var(--faint)}pre .k{color:var(--accent)}
+code.inl{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:var(--ink)}
+.btn{font-family:var(--mono);font-size:12.5px;padding:8px 15px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#241700;cursor:pointer;font-weight:600}
+.btn.ghost{background:none;color:var(--accent)}.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font-family:var(--mono);font-size:12px;padding:7px 12px;background:var(--surface-2);border:none;border-right:1px solid var(--line);cursor:pointer;color:var(--muted)}
+.seg button:last-child{border-right:none}.seg button.on{background:var(--accent);color:#241700}
+.pill{font-family:var(--mono);font-size:12px;padding:6px 11px;border:1px solid var(--line);background:var(--surface-2);border-radius:20px;cursor:pointer;color:var(--muted)}
+.pill:hover{border-color:var(--accent);color:var(--accent)}.pill.on{background:var(--accent);color:#241700;border-color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+input[type=range]{-webkit-appearance:none;height:4px;border-radius:3px;background:var(--surface-2);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+/* ===== tensor（array）呈現 ===== */
+.tsr{font-family:var(--mono);font-size:12.5px;line-height:1.9;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.tsr .pn{color:var(--faint)}
+.tsr .lbl{color:var(--faint);font-size:11px}
+.tn{display:inline-block;padding:0 5px;border-radius:5px;transition:.12s;cursor:default}
+.tn:hover,.tn.hot{background:var(--accent);color:#241700!important}
+.tn.dimmed{opacity:.35}
+.tn.neg{color:var(--cool)}
+.tsrnote{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-height:18px;margin-top:8px}
+.tsrnote b{color:var(--ink)}
+/* 積木進度（書中反覆出現的 7 塊積木圖）*/
+.bricks{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin:14px 0}
+.brick{font-family:var(--mono);font-size:11.5px;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--muted);cursor:pointer;transition:.25s;display:flex;gap:8px;align-items:flex-start}
+.brick .ck{width:16px;height:16px;flex:none;border:1.5px solid var(--line-strong);border-radius:4px;display:grid;place-items:center;font-size:10px;color:#fff;margin-top:1px}
+.brick.done{border-color:var(--ok);color:var(--ink)}.brick.done .ck{background:var(--ok);border-color:var(--ok)}
+.brick.now{border-color:var(--accent);background:var(--accent-ghost);color:var(--ink);box-shadow:0 0 0 3px var(--accent-ghost)}
+.brick.now .ck{border-color:var(--accent);color:var(--accent)}
+/* 句子 chips */
+.sent{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+.wchip{font-family:var(--mono);font-size:13.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);cursor:default;transition:.12s}
+.wchip.hot{background:var(--accent);color:#241700;border-color:var(--accent)}
+.wchip small{display:block;font-size:9.5px;color:var(--faint);text-align:center}
+.wchip.hot small{color:#241700}
+/* shape explorer */
+.shapechips{display:flex;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:14px;align-items:center}
+.dimchip{padding:7px 14px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface-2);cursor:pointer;font-weight:600;transition:.15s}
+.dimchip:hover{border-color:var(--accent)}.dimchip.on{background:var(--accent);color:#241700;border-color:var(--accent)}
+.shapesketch{margin-top:14px;font-family:var(--mono);font-size:12px;overflow-x:auto}
+.sk-batch{display:flex;flex-direction:column;gap:10px}
+.sk-sentence{border:1.5px dashed var(--line-strong);border-radius:10px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;transition:.2s}
+.sk-sentence.on{border-color:var(--accent);background:var(--accent-ghost)}
+.sk-sentence .sk-l{color:var(--faint);font-size:11px;width:88px;flex:none}
+.sk-tok{border:1px solid var(--line);border-radius:7px;padding:6px 9px;background:var(--surface);transition:.2s}
+.sk-tok.on{border-color:var(--accent);background:var(--accent-ghost)}
+.sk-tok .v{color:var(--faint);font-size:10.5px;display:block}
+.sk-tok .v.on{color:var(--accent);font-weight:700}
+/* stepper 共用 */
+.stepbar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.dots{display:flex;gap:6px;align-items:center;margin-left:auto}
+.dot2{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}.dot2.on{background:var(--accent)}
+.stepcap{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--accent-ghost);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;padding:11px 14px;margin-top:12px;min-height:42px}
+.stepcap b{color:var(--accent)}
+/* code-line stepper (transformer block) */
+.codelines{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 0;overflow-x:auto}
+.cl{padding:3px 16px;white-space:pre;color:var(--muted);border-left:3px solid transparent;transition:.2s}
+.cl.lit{background:var(--accent-ghost);border-left-color:var(--accent);color:var(--ink)}
+.cl .cm{color:var(--faint)}
+/* FFN 寬度視覺 */
+.ffn{display:flex;flex-direction:column;gap:6px;align-items:center;margin-top:8px}
+.ffnrow{width:100%;display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.ffnbar{height:34px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--muted);transition:.35s;opacity:.45}
+.ffnrow.lit .ffnbar{border-color:var(--accent);background:var(--accent-ghost);color:var(--ink);opacity:1}
+.ffnarrow{color:var(--faint);font-size:11px}
+/* fwd/bwd */
+.fbsvg{width:100%;height:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:10px}
+.fblegend{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:10px}
+.fblegend i{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:5px}
+/* gradient rows */
+.grow{display:grid;grid-template-columns:60px 1fr 104px;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;margin:7px 0}
+.grow .track{background:var(--surface-2);border-radius:3px;height:15px;overflow:hidden}.grow .track .f{height:100%;border-radius:3px;transition:width .4s}
+/* calculator */
+.calc{display:grid;grid-template-columns:1fr 1fr;gap:22px}@media(max-width:720px){.calc{grid-template-columns:1fr}}
+.ctrl{margin:12px 0}.ctrl label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;margin-bottom:5px}.ctrl label .v{color:var(--accent);font-weight:600}
+.presets{display:flex;flex-wrap:wrap;gap:7px;margin:6px 0 14px}
+.bignum{font-family:var(--mono);font-size:clamp(24px,5vw,36px);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.15}
+.bignum small{font-size:13px;color:var(--muted);margin-left:6px;font-weight:500}
+.brk{margin-top:14px}.brow{display:grid;grid-template-columns:118px 1fr 78px;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;margin:6px 0}
+.brow .barwrap{background:var(--surface-2);border-radius:3px;height:13px;overflow:hidden}.brow .bar{height:100%;background:var(--accent);opacity:.85;transition:width .3s}
+.brow .num{text-align:right;color:var(--muted)}
+.tie{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12px;margin-top:14px;color:var(--muted)}
+.switch{position:relative;width:38px;height:21px;background:var(--surface-2);border:1px solid var(--line);border-radius:20px;cursor:pointer;flex:none;transition:.2s}
+.switch.on{background:var(--accent);border-color:var(--accent)}.switch::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:var(--surface);transition:.2s}.switch.on::after{left:19px}
+.wtshapes{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin-top:14px}
+.wtcard{border:1.5px solid var(--line);border-radius:9px;padding:9px 12px;background:var(--surface-2);transition:.3s}
+.wtcard b{color:var(--accent)}
+.wtshapes.tied .wtcard{border-color:var(--accent);background:var(--accent-ghost)}
+/* decode stepper */
+.decodeids{font-family:var(--mono);font-size:13px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.did{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);transition:.25s}
+.did.new{border-color:var(--accent);background:var(--accent);color:#241700;font-weight:700;animation:pop .3s ease}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+.did small{display:block;font-size:9px;color:var(--faint);text-align:center}.did.new small{color:#241700}
+.decoded{font-family:var(--mono);font-size:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;min-height:44px}
+.decoded .nw{color:var(--accent);font-weight:700}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--accent-ghost);border-radius:0 8px 8px 0;padding:12px 15px;margin:16px 0;max-width:var(--read);font-size:14px;color:var(--muted)}.note b{color:var(--accent)}
+/* io 卡：每節的 layer 示意圖（input → layer → output）*/
+.iocard{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin:12px 0 6px;overflow-x:auto;padding-bottom:2px}
+.iocard .io{display:flex;flex-direction:column;justify-content:center;text-align:center;padding:8px 12px;border-radius:8px;line-height:1.5;flex:none}
+.iocard .in,.iocard .out{border:1.5px dashed var(--line-strong);color:var(--muted);background:var(--surface)}
+.iocard .out{border-color:var(--accent-soft)}
+.iocard .box{border:1.5px solid var(--accent);background:var(--accent-ghost);color:var(--ink);font-weight:600}
+.iocard .box small{display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px}
+.iocard .ioarrow{align-self:center;color:var(--faint);flex:none}
+.iocard .plus{align-self:center;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--accent);display:grid;place-items:center;color:var(--accent);font-weight:700;flex:none}
+/* word→id→embedding 動畫 */
+.w2e{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;min-height:100px}
+.w2e .stg{opacity:.22;transition:opacity .45s,transform .45s;transform:translateY(5px);flex:none}
+.w2e .stg.lit{opacity:1;transform:none}
+.w2e .arrow{color:var(--faint);font-size:10.5px;text-align:center;line-height:1.5}
+.w2e .wordbig{font-size:19px;font-weight:700;color:var(--accent);border:1.5px solid var(--accent);border-radius:10px;padding:10px 16px;background:var(--accent-ghost)}
+.w2e .idbig{font-size:17px;font-weight:700;border:1.5px solid var(--line-strong);border-radius:10px;padding:10px 14px;background:var(--surface-2)}
+.w2e table{border-collapse:collapse;font-size:10.5px}
+.w2e td{border:1px solid var(--line);padding:2px 8px;color:var(--faint)}
+.w2e tr.hit td{background:var(--accent);color:#241700;font-weight:700}
+.w2e .vec{border:1.5px solid var(--accent-soft);border-radius:10px;padding:10px 12px;background:var(--surface-2);min-width:230px;min-height:42px}
+/* 訊號燈條（梯度消失/爆炸） */
+.sigrow{display:grid;grid-template-columns:96px 1fr 200px;gap:10px;align-items:center;font-family:var(--mono);font-size:11.5px;margin:9px 0;color:var(--muted)}
+.sigdots{display:flex;align-items:center;gap:3px;height:34px}
+.sigd{border-radius:50%;background:var(--accent);flex:none;transition:width .2s,height .2s,background .2s}
+.sigd.boom{background:var(--bad)}
+.sigout{color:var(--muted)}.sigout b{color:var(--accent)}.sigout .bad{color:var(--bad);font-weight:700}
+/* GELU vs ReLU：z 數線 */
+.zaxishdr{display:grid;grid-template-columns:52px 1fr 172px;gap:10px;font-family:var(--mono);font-size:10px;color:var(--faint);margin:6px 0 2px}
+.zaxishdr .ax{display:flex;justify-content:space-between;padding:0 4px}
+.zaxishdr .ax b{color:var(--bad)}
+.zlane{display:grid;grid-template-columns:52px 1fr 172px;gap:10px;align-items:center;font-family:var(--mono);font-size:11.5px;margin:8px 0;color:var(--muted)}
+.ztrack{position:relative;height:42px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px}
+.ztrack .zero{position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--bad);opacity:.55}
+.zdot{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;border:1.5px solid var(--line);transition:left .15s;background:var(--surface)}
+.zdot.dead{border-color:var(--bad);color:var(--bad);background:transparent}
+.ncount b{color:var(--accent)}.ncount .bad{color:var(--bad);font-weight:700}
+/* quiz */
+.quiz .q{margin:18px 0}.quiz .qn{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:7px}.quiz .qt{font-weight:600;color:var(--ink);max-width:var(--read);margin-bottom:9px}
+.opt{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 14px;margin:6px 0;cursor:pointer;font-family:var(--sans);font-size:14px;color:var(--ink);max-width:var(--read)}
+.opt:hover{border-color:var(--accent)}.opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.opt .mk{float:right;font-family:var(--mono);font-weight:700}.opt.correct .mk{color:var(--ok)}.opt.wrong .mk{color:var(--bad)}
+.exp{max-width:var(--read);font-size:13px;color:var(--muted);padding:9px 14px;border-left:2px solid var(--accent);margin:5px 0 0;display:none}.exp.show{display:block}
+.foot{font-family:var(--mono);font-size:11px;color:var(--faint);padding:28px 0 70px;text-align:center;line-height:1.9}
+kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<header class="top"><div class="wrap">
+  <div class="brand"><span class="chip">CH·4</span><b><a href="index.html" style="color:inherit;text-decoration:none">從零打造 LLM</a></b><span style="color:var(--faint)">/ 從零實作 GPT 模型</span></div>
+  <div class="spacer"></div><button class="tbtn" id="themeBtn">◐ 主題</button>
+</div></header>
+
+<div class="map">
+  <div class="wrap" id="mapRow"></div>
+  <div class="wrap"><div class="mapsub" id="mapSub"></div></div>
+</div>
+
+<div class="wrap"><div class="shell">
+  <nav class="toc" aria-label="章節導覽">
+    <div class="lbl">Chapter 4</div>
+    <a href="#sec-intro">本章定位 · 7 塊積木</a>
+    <a href="#sec-41">4.1 實作 LLM 架構</a>
+    <a href="#sec-42">4.2 Layer Normalization</a>
+    <a href="#sec-43">4.3 GELU 與 FeedForward</a>
+    <a href="#sec-fb">🔁 前向×反向（補充）</a>
+    <a href="#sec-44">4.4 Shortcut Connection</a>
+    <a href="#sec-45">4.5 Transformer Block</a>
+    <a href="#sec-46">4.6 實作完整 GPT</a>
+    <a href="#sec-47">4.7 生成文字</a>
+    <a href="#sec-sum">本章小結</a>
+    <a href="#sec-quiz">✓ 知識檢核</a>
+  </nav>
+
+  <main>
+    <div class="hero" id="top">
+      <p class="eyebrow">Build a Large Language Model (From Scratch) · Chapter 4</p>
+      <h1>從零實作一個能生成文字的 GPT 模型<span class="sub">Implementing a GPT model from scratch to generate text</span></h1>
+      <p class="lede">前一章我們刻好了 <span class="en">multi-head attention</span>。這一章把其餘積木補齊，照 GPT-2（124M）的架構組裝成一台完整的 GPT——可以跑 <span class="en">forward pass</span>、輸出 <span class="en">logits</span>、逐字生成文字。章節中的關鍵 tensor 都以<strong>真實數值的 array</strong> 呈現，與書中執行輸出一致（暖身區的示意值會另行標明）。</p>
+    </div>
+
+    <!-- ===== 本章定位 ===== -->
+    <section id="sec-intro" data-map="all">
+      <div class="sh"><span class="num">00</span><h2>本章定位：還缺哪些積木？</h2></div>
+      <p>attention 只是引擎，要組成一台能吐字的 GPT 還需要一批「看似配角、缺一不可」的零件。這是本章的積木清單——<strong>它會隨你往下讀自動打勾</strong>（也可以點擊跳到該節）：</p>
+      <div class="bricks" id="bricks"></div>
+      <div class="plain"><div class="ph">🔰 先建立心態</div><p>GPT 的架構沒有想像中複雜。它的「深」不是來自千奇百怪的結構，而是<strong>同一個 transformer block 重複 12 次</strong>。理解一個 block，就理解了整台模型的主體。另外：本章做完的模型<strong>還不會講人話</strong>——權重是隨機的，訓練（pretraining）是第 5 章的事，所以結尾生成出亂碼是預期結果。</p></div>
+
+      <h3>暖身：tensor 就是「多層的 array」</h3>
+      <p>模型看不懂文字，只吃數字。一個字（token）→ 一串數字（<span class="en">vector</span>）；一句話 → 一疊向量（<span class="en">matrix</span>）；一批句子 → 再疊一層（3 維 <span class="en">tensor</span>）。以單字 <b>moves</b> 為例：</p>
+      <div class="stage">
+        <div class="tsr" id="primer"><span class="lbl"># 一個 token：一條向量（GPT-2 用 768 個數字描述一個字；以下數值為示意，非書中輸出）</span>
+"moves"  →  token ID <span class="tn" style="color:var(--accent);font-weight:700">6100</span>  →  tok_emb[6100] = [ 0.0189, -0.4471,  0.7671, …, 0.1029 ]   <span class="lbl"># 768 個數字</span>
+
+<span class="lbl"># 一句話（4 個 token）：一個 2 維矩陣，形狀 [4, 768]</span>
+"Every effort moves you" → [[ …768 個… ],   <span class="lbl"># Every</span>
+                            [ …768 個… ],   <span class="lbl"># effort</span>
+                            [ …768 個… ],   <span class="lbl"># moves</span>
+                            [ …768 個… ]]   <span class="lbl"># you</span>
+
+<span class="lbl"># 一批（2 句）：3 維 tensor，形狀 [2, 4, 768] ← 之後看到方括號數字就是在說這個</span></div>
+      </div>
+    </section>
+
+    <!-- ===== 4.1 ===== -->
+    <section id="sec-41" data-map="s-emb,s-head">
+      <div class="sh"><span class="num">4.1</span><h2>Coding an LLM architecture（實作 LLM 架構）</h2></div>
+      <div class="iocard"><span class="io in">input：token IDs<br>[2, 4]</span><span class="ioarrow">→</span><span class="io box">GPTModel（本節先搭骨架）<small>embedding → 12×block → final LN → head</small></span><span class="ioarrow">→</span><span class="io out">output：logits<br>[2, 4, 50257]</span></div>
+      <p><strong>「參數（parameters）」就是模型裡可被訓練調整的權重（weights）。</strong>一層 2048×2048 的權重矩陣就有 2048×2048 = 4,194,304 個參數。我們瞄準 GPT-2 small（約 124M 參數）：它的預訓練權重公開、筆電跑得動；GPT-3 架構幾乎相同，只是規模放大到 175B。</p>
+      <p>所有超參數集中在一份設定字典。<strong>點任一行看說明：</strong></p>
+      <div class="stage">
+        <div class="codelines" id="cfgLines"></div>
+        <div class="stepcap" id="cfgCap">👆 點一行 config，看它的意思</div>
+      </div>
+
+      <h3>佔位骨架 DummyGPTModel</h3>
+      <p>在刻好每個零件前，先用「什麼都不做、原樣回傳」的假模組把骨架搭起來，看清楚資料怎麼從輸入流到輸出：</p>
+      <pre>class DummyGPTModel(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.tok_emb = nn.Embedding(cfg["vocab_size"], cfg["emb_dim"])   <span class="c"># token 查表成向量</span>
+        self.pos_emb = nn.Embedding(cfg["context_length"], cfg["emb_dim"]) <span class="c"># 位置查表成向量</span>
+        self.drop_emb = nn.Dropout(cfg["drop_rate"])
+        self.trf_blocks = nn.Sequential(                                  <span class="c"># 12 個（假的）block</span>
+            *[DummyTransformerBlock(cfg) for _ in range(cfg["n_layers"])])
+        self.final_norm = DummyLayerNorm(cfg["emb_dim"])                  <span class="c"># （假的）最終正規化</span>
+        self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)
+
+    def forward(self, in_idx):
+        tok_embeds = self.tok_emb(in_idx)
+        pos_embeds = self.pos_emb(torch.arange(in_idx.shape[1], device=in_idx.device))
+        x = tok_embeds + pos_embeds     <span class="c"># 「是什麼字」+「在第幾位」</span>
+        x = self.drop_emb(x)
+        x = self.trf_blocks(x)
+        x = self.final_norm(x)
+        return self.out_head(x)         <span class="c"># 投影回 50257 維 → logits</span></pre>
+
+      <h3>動畫：一個英文字如何走進模型</h3>
+      <p>在餵整個 batch 之前，先看<strong>單一個字</strong>的完整旅程：文字 → 查 vocabulary 得到整數 ID → 到 embedding 表取出那一列向量。選一個字、按播放：</p>
+      <div class="stage">
+        <div class="controls">
+          <span class="small">選字：</span><span id="w2eWords"></span>
+          <span style="flex:1"></span>
+          <button class="btn" id="w2ePlay">▶ 播放</button>
+        </div>
+        <div class="w2e" id="w2e">
+          <div class="stg" data-s="0"><div class="wordbig" id="w2eWord">moves</div></div>
+          <div class="stg arrow" data-s="1">tokenizer<br>查 vocab<br>→</div>
+          <div class="stg" data-s="1"><div class="idbig" id="w2eId">6100</div></div>
+          <div class="stg arrow" data-s="2">nn.Embedding<br>查表取列<br>→</div>
+          <div class="stg" data-s="2"><table id="w2eTable"></table></div>
+          <div class="stg arrow" data-s="3">→</div>
+          <div class="stg" data-s="3"><div class="vec" id="w2eVec"></div><div class="small" style="margin-top:4px">768 維向量（示意值）</div></div>
+        </div>
+      </div>
+
+      <h3>實際餵資料：兩句話的 batch</h3>
+      <p>用 tiktoken 把兩句話編碼成一個 batch。<strong>滑過下面的字或數字，看文字 ↔ token ID 的對應</strong>（注意兩句開頭都是 Every → 同一個 ID 6109）：</p>
+      <div class="stage">
+        <div class="sent" id="batchWords"></div>
+        <div class="tsr" id="batchTsr"></div>
+        <div class="tsrnote" id="batchNote">滑過任何一個字或 ID 試試 →</div>
+      </div>
+
+      <h3>輸出形狀 [2, 4, 50257]</h3>
+      <p>把 batch 餵進模型（<code class="inl">torch.manual_seed(123)</code>），輸出 logits 的形狀是 <code class="inl">torch.Size([2, 4, 50257])</code>。<strong>點下面三個維度，看每一維在 array 裡對應什麼：</strong></p>
+      <div class="stage">
+        <div class="shapechips">
+          <span class="lbl small">torch.Size( [</span>
+          <span class="dimchip" data-d="0">2</span><span class="small">,</span>
+          <span class="dimchip" data-d="1">4</span><span class="small">,</span>
+          <span class="dimchip" data-d="2">50257</span>
+          <span class="lbl small">] )</span>
+        </div>
+        <div class="shapesketch" id="shapeSketch"></div>
+        <div class="stepcap" id="shapeCap">👆 點一個維度</div>
+      </div>
+      <div class="note"><b>關鍵：</b>輸入幾個 token，輸出就有幾個對應向量——模型對<strong>每一個位置</strong>都給出「下一個 token 是誰」的 50257 個分數（logits，尚未過 softmax）。生成時我們只取最後一個位置的那條。</div>
+    </section>
+
+    <!-- ===== 4.2 ===== -->
+    <section id="sec-42" data-map="s-block" data-sub="0,3">
+      <div class="sh"><span class="num">4.2</span><h2>Normalizing activations with layer normalization</h2></div>
+      <div class="iocard"><span class="io in">input：x<br>[2, 4, 768]</span><span class="ioarrow">→</span><span class="io box">LayerNorm(768)<small>每個 token 的 768 維 → mean 0 / var 1，再乘 scale 加 shift</small></span><span class="ioarrow">→</span><span class="io out">output：x′<br>[2, 4, 768]（形狀不變）</span></div>
+      <p>深層網路常遇到 <span class="en">vanishing / exploding gradient</span>（梯度消失／爆炸），訓練極不穩定。<span class="en">Layer normalization</span> 的核心想法：<strong>把一層的輸出調整成 mean 0、variance 1</strong>（unit variance），加速收斂、穩定訓練。</p>
+      <div class="plain"><div class="ph">🔰 白話說明</div><p>像考試「調分」：把一組高低不齊的數字拉成「平均 0、散開程度一致」的標準形狀。它是<strong>每個樣本自己調自己的</strong>（沿特徵維），跟 batch 裡其他樣本無關——這是它和 batch normalization 最大的差別，也是它不怕 batch size 變動、適合 LLM 的原因。</p></div>
+
+      <h3>互動①：訊號穿過 30 層，會發生什麼事？</h3>
+      <p>把一個訊號丟進 30 層的網路（真實矩陣相乘）。<strong>第 l 顆點＝訊號過完第 l 層時的大小</strong>——精確說是該層輸出向量的 <span class="en">RMS</span>（均方根：√mean(x²)，24 個數字「典型有多大」；不用平均值是因為正負會抵銷）。點縮小到看不見＝訊號消失、點變紅＝數值爆掉；滑鼠停在點上可看實際數值。</p>
+      <div class="plain"><div class="ph">🔰 s 是什麼？（不是 activation，也不是單一權重）</div><p>模擬中每層算的是 <b>y = (s·W)·x</b>：<b>W</b> 是那一層的權重<strong>矩陣</strong>（幾百個不同的數字，每層都不一樣），<b>s</b>（scale）是把整個 W 一起放大／縮小的<strong>倍率</strong>——代表該層權重的「整體大小」。<b>點的大小才是 activation（訊號值）</b>：s 決定 activation 每過一層被放大或縮小多少，走到第 l 層時量級 ≈ s^l。可怕之處在於要<strong>連乘 30 次</strong>：s=0.9 看似無害，0.9³⁰ ≈ 0.04；s=1.1 也看似無害，1.1³⁰ ≈ 17.4。真實網路裡沒有一顆叫 s 的旋鈕——權重大小是初始化與訓練自然形成的，<strong>沒人能保證它剛好停在 1.0</strong>（Xavier/He initialization 就是想把每層的等效 s 調到 ≈ 1）。</p></div>
+      <div class="stage">
+        <div class="controls" style="gap:14px">
+          <span class="small">每層把訊號乘上的倍率 s = <b id="glVal" style="color:var(--accent)">0.70</b></span>
+          <input type="range" id="glSlider" min="0.5" max="2" step="0.05" value="0.7" style="flex:1;min-width:180px">
+        </div>
+        <div class="sigrow"><span class="siglab">無 LayerNorm</span><div class="sigdots" id="sigNo"></div><span class="sigout" id="sigNoOut"></span></div>
+        <div class="sigrow"><span class="siglab">每層加 LN</span><div class="sigdots" id="sigLn"></div><span class="sigout" id="sigLnOut"></span></div>
+        <div class="stepcap" id="glCap"></div>
+      </div>
+
+      <h3>互動②：那 loss 會怎樣？（瀏覽器裡真的訓練 300 步）</h3>
+      <p>同一個 6 層小網路，只差在<strong>初始權重的倍率 s</strong>（就是互動①那顆旋鈕，訓練開始時權重的整體大小）：s=0.3（太小）、s=3.0（太大）、s=3.0 但每層加 LayerNorm。在你的瀏覽器裡<strong>實際跑 300 步訓練</strong>（真實 forward + backward + 權重更新），把 loss 畫出來：</p>
+      <div class="stage">
+        <div style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px"><canvas id="tlCv" width="820" height="300"></canvas></div>
+        <div class="stepcap" id="tlCap"></div>
+      </div>
+      <div class="note"><b>把結論記成三句話：</b>梯度 → 0 ⇒ 權重不再更新 ⇒ <b>loss 卡住不動</b>（注意：不是變 0！）；梯度 → ∞ ⇒ 數值溢位 ⇒ <b>loss 變 NaN，訓練直接炸掉</b>；加 LayerNorm ⇒ 每層訊號被校準回同一量級 ⇒ <b>loss 才能順利下降</b>。這正是 GPT 在每個子層前都放 LayerNorm（Pre-LN）的原因。</div>
+
+      <h3>先看 dim 往哪個方向算</h3>
+      <p>書中的例子：<code class="inl">torch.randn(2,5)</code> 過一層 <code class="inl">Linear(5,6)+ReLU</code>，得到一個 2×6 的輸出（ReLU 把負值壓成 0，所以沒有負數）。<strong>切換 dim，看平均值是「沿哪個方向」算的：</strong></p>
+      <div class="stage">
+        <div class="controls">
+          <span class="seg" id="dimSeg"><button data-d="-1" class="on">dim=-1（每列一個 mean）</button><button data-d="0">dim=0（每行一個 mean）</button></span>
+        </div>
+        <div class="tsr" id="dimTsr"></div>
+        <div class="tsrnote" id="dimNote"></div>
+      </div>
+
+      <h3>一步步做正規化（數值即時計算，和書中輸出一致）</h3>
+      <div class="stage">
+        <div class="tsr" id="lnTsr"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="lnPrev">← 上一步</button>
+          <button class="btn" id="lnNext">下一步 →</button>
+          <span class="dots" id="lnDots"></span>
+        </div>
+        <div class="stepcap" id="lnCap"></div>
+      </div>
+      <pre>class LayerNorm(nn.Module):
+    def __init__(self, emb_dim):
+        super().__init__()
+        self.eps = 1e-5                                  <span class="c"># 防止除以零</span>
+        self.scale = nn.Parameter(torch.ones(emb_dim))   <span class="c"># 可訓練縮放</span>
+        self.shift = nn.Parameter(torch.zeros(emb_dim))  <span class="c"># 可訓練平移</span>
+
+    def forward(self, x):
+        mean = x.mean(dim=-1, keepdim=True)              <span class="c"># keepdim 保形狀好做廣播</span>
+        var  = x.var(dim=-1, keepdim=True, unbiased=False)
+        norm_x = (x - mean) / torch.sqrt(var + self.eps)
+        return self.scale * norm_x + self.shift</pre>
+      <div class="note"><b>unbiased=False 的理由：</b>變異數分母用 <code class="inl">n</code> 而非 <code class="inl">n−1</code>（不做 Bessel 校正）。emb_dim=768 很大，差異可忽略；更重要的是原始 GPT-2 用 TensorFlow 實作、預設就是這樣算——設定相同，第 6 章載入 OpenAI 預訓練權重才相容。</div>
+    </section>
+
+    <!-- ===== 4.3 ===== -->
+    <section id="sec-43" data-map="s-block" data-sub="4">
+      <div class="sh"><span class="num">4.3</span><h2>Implementing a feed forward network with GELU activations</h2></div>
+      <div class="iocard"><span class="io in">input：x<br>[2, 3, 768]</span><span class="ioarrow">→</span><span class="io box">FeedForward<small>Linear 768→3072 · GELU · Linear 3072→768</small></span><span class="ioarrow">→</span><span class="io out">output<br>[2, 3, 768]（形狀不變）</span></div>
+      <p>LLM 不用傳統 <span class="en">ReLU</span>，改用更平滑的 <span class="en">GELU</span>（Gaussian error linear unit）。精確定義是 <code class="inl">GELU(x) = x·Φ(x)</code>（Φ 是標準常態的 CDF），實務用便宜的近似式（原始 GPT-2 也用它）：</p>
+      <pre>GELU(x) ≈ 0.5·x·(1 + tanh[ √(2/π)·(x + 0.044715·x³) ])</pre>
+      <div class="stage"><div style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px"><canvas id="geluCv" width="800" height="300"></canvas></div><div class="small" style="margin-top:8px">滑鼠移到曲線上逐點比較。ReLU 在 0 有尖角、負值一律歸零（梯度也歸零，神經元可能「死掉」）；GELU 平滑、負值仍有小的非零輸出，訓練更好調。</div></div>
+
+      <h3>互動：GELU 的好處——神經元不會「死掉」</h3>
+      <div class="plain"><div class="ph">🔰 先懂情境</div><p>一個神經元收到的輸入值 <b>z</b>（＝前一層輸出乘上權重的加總）在訓練過程會<strong>不斷漂移</strong>——因為權重每一步都在變。下圖把 24 個神經元照它們的 z 值排在數線上，<strong>z = 0 是 ReLU 的生死線</strong>：一旦漂到左邊（負區），ReLU 的輸出是 0、梯度也恰為 0 → 權重從此不再更新 → 這個神經元<strong>永遠困在負區</strong>（dying ReLU）。GELU 在負區仍保留一點梯度，還能被訓練慢慢拉回右邊。</p></div>
+      <div class="stage">
+        <div class="controls" style="gap:14px">
+          <span class="small">模擬訓練中的漂移：把所有 z 平移 <b id="drVal" style="color:var(--accent)">0.0</b></span>
+          <input type="range" id="drSlider" min="-3" max="3" step="0.1" value="0" style="flex:1;min-width:180px">
+        </div>
+        <div class="zaxishdr"><span></span><div class="ax"><span>z = −4</span><b>0（ReLU 生死線）</b><span>z = +4</span></div><span></span></div>
+        <div class="zlane"><span class="zlab">ReLU</span><div class="ztrack" id="drRelu"></div><span class="ncount" id="drReluN"></span></div>
+        <div class="zlane"><span class="zlab">GELU</span><div class="ztrack" id="drGelu"></div><span class="ncount" id="drGeluN"></span></div>
+        <div class="stepcap" id="drCap"></div>
+      </div>
+
+      <h3>FeedForward：768 → 3072 → 768</h3>
+      <p>transformer block 裡的前饋網路＝兩個 <code class="inl">Linear</code> 夾一個 GELU。先<strong>放大 4 倍</strong>到更寬的空間探索特徵、過非線性、再<strong>收縮回原維度</strong>。點「下一步」看形狀流動（用書中的輸入 <code class="inl">[2, 3, 768]</code>）：</p>
+      <div class="stage">
+        <div class="ffn" id="ffnFlow"></div>
+        <div class="stepbar">
+          <button class="btn" id="ffnNext">下一步 →</button><button class="btn ghost" id="ffnReset">重置</button>
+          <span class="small" id="ffnCap" style="flex:1"></span>
+        </div>
+      </div>
+      <pre>class FeedForward(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(cfg["emb_dim"], 4 * cfg["emb_dim"]),  <span class="c"># 768 → 3072（放大 4 倍）</span>
+            GELU(),
+            nn.Linear(4 * cfg["emb_dim"], cfg["emb_dim"]),  <span class="c"># 3072 → 768（收縮回來）</span>
+        )</pre>
+      <div class="note"><b>為什麼進出同維度？</b>進去 768、出來也 768，這種一致性才能把模組一路往上疊，中間不必調整維度——這是 transformer「可堆疊」的關鍵設計。</div>
+    </section>
+
+    <!-- ===== 補充：前向×反向 ===== -->
+    <section id="sec-fb" data-map="s-block">
+      <div class="sh"><span class="num">🔁</span><h2>補充：前向傳播 × 反向傳播</h2></div>
+      <div class="iocard"><span class="io in">input：x<br>[2]</span><span class="ioarrow">→</span><span class="io box">小型網路<small>Linear+tanh（3 節點）→ Linear</small></span><span class="ioarrow">→</span><span class="io out">output：ŷ 與 loss<br>（backward 再沿原路回傳梯度）</span></div>
+      <p class="cap" style="color:var(--muted)">下一節會用「各層梯度」證明 shortcut 的威力——先花兩分鐘搞懂梯度從哪來。<span class="en">forward pass</span> 把輸入算成預測、算出 loss；<span class="en">backward pass</span>（backpropagation）用連鎖律從 loss 往回，算出每個權重「該往哪調」。</p>
+      <div class="stage">
+        <div class="controls">
+          <span class="seg" id="fbSeg"><button data-p="fwd" class="on">① 前向 forward</button><button data-p="bwd">② 反向 backward</button></span>
+          <span style="flex:1"></span>
+          <button class="btn ghost" id="fbPrev">← 上一步</button>
+          <button class="btn" id="fbNext">下一步 →</button>
+          <span class="dots" id="fbDots"></span>
+        </div>
+        <svg class="fbsvg" id="fbSvg" viewBox="0 0 660 300" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="stepcap" id="fbCap"></div>
+        <div class="fblegend">
+          <span><i style="background:var(--accent)"></i>前向：activation（往右流）</span>
+          <span><i style="background:var(--cool)"></i>反向：gradient（往左流）</span>
+          <span>數值皆即時計算的真值</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4.4 ===== -->
+    <section id="sec-44" data-map="s-block" data-sub="2,5">
+      <div class="sh"><span class="num">4.4</span><h2>Adding shortcut connections（加入捷徑連接）</h2></div>
+      <div class="iocard"><span class="io in">input：x</span><span class="ioarrow">→</span><span class="io box">任意子層<small>Linear+GELU / attention / FFN …</small></span><span class="ioarrow">→</span><span class="plus">＋</span><span class="ioarrow" style="font-size:10px">x 走捷徑<br>直接加回</span><span class="ioarrow">→</span><span class="io out">output = 子層(x) + x<br>（形狀相同才能相加）</span></div>
+      <p><span class="en">Shortcut connection</span>（又稱 skip / residual connection，源自電腦視覺的 ResNet）作法樸素到不可思議：<strong>把某一層的輸入，直接加到那一層的輸出上</strong>。這等於替反向傳播的梯度開一條「抄近路」的旁路，繞過中間運算、避免梯度層層縮小。</p>
+      <p>書中用一個 5 層小網路（每層 Linear+GELU）實測。<code class="inl">forward</code> 裡可選擇要不要加捷徑：</p>
+      <pre>def forward(self, x):
+    for layer in self.layers:
+        layer_output = layer(x)
+        if self.use_shortcut and x.shape == layer_output.shape:
+            x = x + layer_output      <span class="c"># 加回輸入＝捷徑</span>
+        else:
+            x = layer_output
+    return x</pre>
+      <p><strong>切換開關，比較各層權重的平均絕對梯度</strong>（右側是書中實際的 print 輸出）：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="gSeg"><button data-g="0" class="on">use_shortcut=False</button><button data-g="1">use_shortcut=True</button></span></div>
+        <div id="gradViz"></div>
+        <div class="tsr" id="gradPrint" style="margin-top:12px"></div>
+        <div class="stepcap" id="gradCap"></div>
+      </div>
+    </section>
+
+    <!-- ===== 4.5 ===== -->
+    <section id="sec-45" data-map="s-block">
+      <div class="sh"><span class="num">4.5</span><h2>Connecting attention and linear layers in a transformer block</h2></div>
+      <div class="iocard"><span class="io in">input：x<br>[2, 4, 768]</span><span class="ioarrow">→</span><span class="io box">TransformerBlock<small>LN → attention → +x　·　LN → FFN → +x</small></span><span class="ioarrow">→</span><span class="io out">output<br>[2, 4, 768]（內容重新編碼）</span></div>
+      <p>把 MultiHeadAttention、LayerNorm、FeedForward、dropout、shortcut 全部組進一個 <span class="en">transformer block</span>——GPT-2 small 把它重複 12 次。兩個子模組分工明確：</p>
+      <ul class="clean">
+        <li><b>multi-head attention</b>：「跨位置」的資訊交流——讓每個 token 看到並吸收其他 token 的資訊。</li>
+        <li><b>feed forward</b>：「逐位置」的加工——對每個位置的向量獨立做非線性變換。</li>
+      </ul>
+      <p><strong>逐行走一遍 forward</strong>（注意兩個子層都是同一個範式：存 shortcut → LayerNorm → 子層 → dropout → 加回）：</p>
+      <div class="stage">
+        <div class="codelines" id="blkLines"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="blkPrev">← 上一行</button>
+          <button class="btn" id="blkNext">下一行 →</button>
+          <span class="small" style="margin-left:auto">目前形狀：<b style="color:var(--accent)" id="blkShape">[2, 4, 768]</b></span>
+        </div>
+        <div class="stepcap" id="blkCap">👆 按「下一行」逐行執行 TransformerBlock.forward</div>
+      </div>
+      <div class="note"><b>Pre-LayerNorm vs Post-LayerNorm：</b>本實作把 LayerNorm 放在<strong>進子層之前</strong>（Pre-LN，現代 GPT 的做法，訓練較穩定）；原始 transformer 論文放在子層之後（Post-LN），較容易訓練不穩。</div>
+      <div class="note"><b>形狀不變 ≠ 內容不變：</b>輸入 <code class="inl">[2, 4, 768]</code>、輸出仍是 <code class="inl">[2, 4, 768]</code>，但每個位置的向量已被重新編碼成整合了整句資訊的 <span class="en">context vector</span>——每過一個 block，token 的表徵就「更懂上下文」。</div>
+    </section>
+
+    <!-- ===== 4.6 ===== -->
+    <section id="sec-46" data-map="s-emb,s-block,s-fnorm,s-head">
+      <div class="sh"><span class="num">4.6</span><h2>Coding the GPT model（實作完整 GPT）</h2></div>
+      <div class="iocard"><span class="io in">input：token IDs<br>[batch, tokens]</span><span class="ioarrow">→</span><span class="io box">GPTModel<small>tok+pos embedding → dropout → 12×TransformerBlock → final LN → linear head</small></span><span class="ioarrow">→</span><span class="io out">output：logits<br>[batch, tokens, 50257]</span></div>
+      <p>把骨架裡的假模組換成真貨，就是完整的 <code class="inl">GPTModel</code>：embedding → <strong>12× TransformerBlock</strong> → final LayerNorm → linear output head。輸出形狀依然 <code class="inl">[2, 4, 50257]</code>。</p>
+      <pre>self.trf_blocks = nn.Sequential(
+    *[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])   <span class="c"># 這次是真的 12 層</span>
+self.final_norm = LayerNorm(cfg["emb_dim"])
+self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)</pre>
+
+      <h3>參數量：163M 與 124M 的差別（weight tying）</h3>
+      <div class="stage">
+        <div class="tsr">total_params = sum(p.numel() for p in model.parameters())
+<span class="pn"># Total number of parameters:</span> <b style="color:var(--accent)">163,009,536</b></div>
+        <p style="margin-top:12px">祕密在 <span class="en">weight tying</span>（權重綁定）：原始 GPT-2 讓<strong>輸出層直接重用 token embedding 的權重</strong>。看形狀就懂——兩層一模一樣、互為反向操作：</p>
+        <div class="wtshapes" id="wtShapes">
+          <div class="wtcard">tok_emb.weight → <b>[50257, 768]</b><br><span class="small">token ID → 768 維向量</span></div>
+          <div id="wtArrow" style="font-family:var(--mono);color:var(--faint)">≠</div>
+          <div class="wtcard">out_head.weight → <b>[50257, 768]</b><br><span class="small">768 維向量 → 50257 個分數</span></div>
+        </div>
+        <div class="tsr" style="margin-top:12px">163,009,536 − (50257 × 768) = 163,009,536 − 38,597,376 = <b style="color:var(--accent)">124,412,160</b>  <span class="pn"># ≈ 124M ✓</span></div>
+        <p style="margin-top:10px">我們的實作採「兩層各自獨立」（163M），因為經驗上訓練效果較好、現代 LLM 也多如此；tying 的好處是省記憶體。163M 個 32-bit float（每個 4 bytes）合計 <b style="color:var(--accent)">621.83 MB</b>——「小」模型的權重也相當可觀。</p>
+      </div>
+
+      <h3>動手感受規模：參數計算器</h3>
+      <p>拖動滑桿即時計算總參數與記憶體。preset 是書中列的四種 GPT-2 尺寸（medium 1024/24 層、large 1280/36、XL 1600/48）：</p>
+      <div class="stage">
+        <div class="presets" id="presets">
+          <button class="pill on" data-p="s">small · 124M</button><button class="pill" data-p="m">medium · 355M</button><button class="pill" data-p="l">large · 774M</button><button class="pill" data-p="xl">XL · 1558M</button>
+        </div>
+        <div class="small" style="margin:-4px 0 12px">preset 標示為 weight tying 後的官方參數量（點擊會自動打開 tying，計算結果即與標籤一致）。本章原文沿用 GPT-2 論文的說法，稱 medium / large / XL 為 345M / 762M / 1,542M——兩套數字的差異來自後來的參數計數校正。</div>
+        <div class="calc">
+          <div>
+            <div class="ctrl"><label>emb_dim<span class="v" id="vEmb">768</span></label><input type="range" id="sEmb" min="128" max="1600" step="64" value="768"></div>
+            <div class="ctrl"><label>n_layers<span class="v" id="vLay">12</span></label><input type="range" id="sLay" min="1" max="48" step="1" value="12"></div>
+            <div class="ctrl"><label>n_heads<span class="v" id="vHed">12</span></label><input type="range" id="sHed" min="1" max="25" step="1" value="12"><div class="small" style="margin-top:3px">n_heads 不影響參數量（只把 emb_dim 切成幾份）</div></div>
+            <div class="ctrl"><label>vocab_size<span class="v" id="vVoc">50257</span></label><input type="range" id="sVoc" min="10000" max="50257" step="1" value="50257"></div>
+            <div class="tie"><div class="switch" id="tieSw"></div><span>weight tying（共用 token embedding）</span></div>
+          </div>
+          <div>
+            <div class="small" style="text-transform:uppercase;letter-spacing:.06em">總參數</div>
+            <div class="bignum"><span id="totNum">163.0</span><small id="totRaw">M</small></div>
+            <div class="small" style="margin-top:6px">記憶體（float32）≈ <b style="color:var(--accent)" id="memMB">621.83</b> MB</div>
+            <div class="small" style="margin-top:4px" id="perBlock"></div>
+            <div class="brk" id="brk"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4.7 ===== -->
+    <section id="sec-47" data-map="s-head,s-gen">
+      <div class="sh"><span class="num">4.7</span><h2>Generating text（生成文字）</h2></div>
+      <div class="iocard"><span class="io in">input：idx<br>[1, n]</span><span class="ioarrow">→</span><span class="io box">model → 取 [:, -1, :] → softmax → argmax<small>只看最後一個位置的預測</small></span><span class="ioarrow">→</span><span class="io out">output：idx<br>[1, n+1]（接回再跑，迴圈）</span></div>
+      <p>生成式模型<strong>一次產生一個 token</strong>、接龍式寫句子。單步機制：模型輸出 logits → <strong>只取最後一個位置</strong>那條 50257 維向量 → softmax 轉機率 → argmax 挑最大 → 把新 token ID 接回輸入 → 再跑一輪。</p>
+      <pre>def generate_text_simple(model, idx, max_new_tokens, context_size):
+    for _ in range(max_new_tokens):
+        idx_cond = idx[:, -context_size:]        <span class="c"># 超長就裁掉前面</span>
+        with torch.no_grad():                    <span class="c"># 推論不用算梯度，省時省記憶體</span>
+            logits = model(idx_cond)
+        logits = logits[:, -1, :]                <span class="c"># (batch, n_token, vocab) → 只取最後一格</span>
+        probas = torch.softmax(logits, dim=-1)
+        idx_next = torch.argmax(probas, dim=-1, keepdim=True)  <span class="c"># greedy：挑機率最高</span>
+        idx = torch.cat((idx, idx_next), dim=1)  <span class="c"># 接回序列尾巴</span>
+    return idx</pre>
+      <div class="note"><b>softmax 其實可以省：</b>softmax 是單調函數，不改變大小順序——logits 最大值的位置＝softmax 後最大值的位置，直接對 logits 做 argmax 結果相同。這裡保留它，是為了把「logits → 機率」的過程完整展示。</div>
+
+      <h3>實跑：模型還沒訓練，會發生什麼事？</h3>
+      <p>把 <code class="inl">"Hello, I am"</code> 編碼成 <code class="inl">[15496, 11, 314, 716]</code>、模型切到 <code class="inl">model.eval()</code>（關掉 dropout），生成 6 個新 token。<strong>按「生成下一個 token」逐步看 ID array 長大</strong>——這些是書中用 seed 123 跑出的真實輸出：</p>
+      <div class="stage">
+        <div class="decodeids" id="decIds"></div>
+        <div class="decoded" id="decText"></div>
+        <div class="stepbar">
+          <button class="btn" id="decNext">🎲 生成下一個 token</button>
+          <button class="btn ghost" id="decAll">跑完 6 步</button>
+          <button class="btn ghost" id="decReset">重置</button>
+          <span class="dots" id="decDots"></span>
+        </div>
+        <div class="stepcap" id="decCap"></div>
+      </div>
+      <div class="note"><b>亂碼是預期結果！</b>模型權重還是隨機初始化的，當然語無倫次。這精準凸顯了：<strong>架構只是骨架，訓練才是賦予語言能力的靈魂</strong>——下一章 Pretraining 就來解決它。</div>
+    </section>
+
+    <!-- ===== 小結 ===== -->
+    <section id="sec-sum" data-map="all">
+      <div class="sh"><span class="num">▣</span><h2>本章小結</h2></div>
+      <ul class="clean">
+        <li><b>Layer normalization</b> 沿特徵維（dim=-1）把輸出調成 mean 0 / var 1，穩定訓練；scale/shift 可訓練、eps 防除零、unbiased=False 相容 GPT-2 權重。</li>
+        <li><b>GELU</b> 平滑、負值保留非零梯度，比 ReLU 更適合深層 LLM。</li>
+        <li><b>FeedForward</b>：768 → 3072 → 768，「膨脹—非線性—收縮」探索更豐富的表徵。</li>
+        <li><b>Shortcut connection</b> 把輸入加回輸出；5 層實測：無捷徑第 1 層梯度 0.0002（消失）、有捷徑 0.22（穩定），差三個數量級。</li>
+        <li><b>Transformer block</b>＝attention（跨位置）＋ feed forward（逐位置），Pre-LayerNorm＋雙捷徑；形狀不變、內容重新編碼。</li>
+        <li><b>GPTModel</b>＝embedding ＋ 12×block ＋ final norm ＋ output head；我們 163M，GPT-2 靠 weight tying 記為 124M，權重約 622 MB。</li>
+        <li><b>生成</b>＝取最後一格 logits → softmax → argmax（greedy）→ 接回輸入循環；未訓練 → 亂碼。</li>
+      </ul>
+    </section>
+
+    <section id="sec-quiz" data-map="all">
+      <div class="sh"><span class="num">✓</span><h2>知識檢核</h2></div>
+      <p class="small" style="margin-bottom:14px">// 六題，作答後立即看解析</p>
+      <div class="quiz" id="quizBox"></div>
+      <div id="score" style="font-family:var(--mono);font-size:14px;color:var(--accent);margin-top:16px"></div>
+    </section>
+
+    <div class="foot">從零打造 LLM · 第 4 章互動教材 ｜ 講解為原創文字，程式碼與數值對應 Sebastian Raschka《Build a Large Language Model (From Scratch)》Ch.4 的公開程式與執行輸出，非原文翻譯<br>頁面中的計算皆為瀏覽器即時運算　·　快捷鍵 <kbd>T</kbd> 切換主題</div>
+  </main>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const root=document.documentElement;
+const css=v=>getComputedStyle(root).getPropertyValue(v).trim();
+$("#themeBtn").addEventListener("click",()=>{const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",cur==="dark"?"light":"dark");});
+addEventListener("keydown",e=>{if(e.target.matches&&e.target.matches("input,textarea"))return;if(e.key==="t"||e.key==="T")$("#themeBtn").click();});
+
+/* ===== 全域管線圖 ===== */
+const STAGES=[
+ {id:"s-text",em:"📝",label:"文字"},{id:"s-tok",em:"✂️",label:"Tokenize"},{id:"s-emb",em:"▦",label:"Embedding"},
+ {id:"s-block",em:"🧱",label:"Transformer×12",block:true},{id:"s-fnorm",em:"≈",label:"Final LN"},
+ {id:"s-head",em:"◇",label:"Output Head"},{id:"s-gen",em:"💬",label:"生成"}];
+const SUBNAMES=["LayerNorm","Attention","+shortcut","LayerNorm","FeedForward","+shortcut"];
+$("#mapRow").innerHTML=STAGES.map((s,i)=>`<div class="mapstage ${s.block?'block':''}" data-id="${s.id}"><span class="em">${s.em}</span>${s.label}</div>`+(i<STAGES.length-1?'<span class="mapsep">›</span>':'')).join("");
+$$(".mapstage").forEach(el=>el.addEventListener("click",()=>{const sec=[...$$("section")].find(s=>(s.dataset.map||"").split(",").includes(el.dataset.id));if(sec){sec.scrollIntoView();}else{document.getElementById("top").scrollIntoView();$("#mapSub").innerHTML=`📝 文字 → ✂️ Tokenize 屬第 2 章的內容；本章從 Embedding 之後開始實作`;}}));
+function setMap(sec){
+  const raw=(sec&&sec.dataset.map)||"all";
+  const ids=raw==="all"?STAGES.map(s=>s.id):raw.split(",");
+  $$(".mapstage").forEach(el=>el.classList.toggle("lit",ids.includes(el.dataset.id)));
+  const sub=sec&&sec.dataset.sub;
+  if(sub){const names=sub.split(",").map(i=>SUBNAMES[+i]);$("#mapSub").innerHTML=`Transformer Block 內：<b>${names.join(" · ")}</b>`;}
+  else if(ids.length===1&&ids[0]==="s-block"){$("#mapSub").innerHTML=`目前在 <b>Transformer Block</b>（重複 12 次的核心單元）`;}
+  else if(raw==="all"){$("#mapSub").innerHTML=`GPT 全景：資料由左往右流過整條管線`;}
+  else{const lbls=ids.map(id=>STAGES.find(s=>s.id===id).label);$("#mapSub").innerHTML=`目前在：<b>${lbls.join(" · ")}</b>`;}
+}
+
+/* ===== 積木進度 ===== */
+const BRICKS=[["1","GPT 骨架","sec-41"],["2","Layer norm","sec-42"],["3","GELU","sec-43"],["4","Feed forward","sec-43"],["5","Shortcut","sec-44"],["6","Transformer block","sec-45"],["7","完整 GPT","sec-46"]];
+$("#bricks").innerHTML=BRICKS.map(b=>`<div class="brick" data-sec="${b[2]}"><span class="ck"></span><span><b>${b[0]}</b> ${b[1]}</span></div>`).join("");
+$$(".brick").forEach(el=>el.addEventListener("click",()=>document.getElementById(el.dataset.sec).scrollIntoView()));
+const SEC_ORDER=["sec-intro","sec-41","sec-42","sec-43","sec-fb","sec-44","sec-45","sec-46","sec-47","sec-sum","sec-quiz"];
+function setBricks(curId){
+  const cur=SEC_ORDER.indexOf(curId);
+  $$(".brick").forEach(el=>{
+    const bi=SEC_ORDER.indexOf(el.dataset.sec);
+    el.classList.toggle("done",cur>bi);
+    el.classList.toggle("now",el.dataset.sec===curId||(curId==="sec-fb"&&el.dataset.sec==="sec-44"));
+    if(el.classList.contains("done"))el.querySelector(".ck").textContent="✓";
+    else el.querySelector(".ck").textContent="";
+  });
+}
+
+/* nav + prog + map + bricks */
+const secs=$$("section, .hero"),links=$$("nav.toc a");
+function onScroll(){
+  const h=document.documentElement;$("#prog").style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+"%";
+  let cur=secs[0];for(const s of secs)if(s.getBoundingClientRect().top<=150)cur=s;
+  links.forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+cur.id));
+  setMap(cur.tagName==="SECTION"?cur:null);
+  setBricks(cur.id);
+}
+addEventListener("scroll",onScroll,{passive:true});onScroll();
+
+/* ===== 4.1 config explorer ===== */
+const CFG=[
+ ['GPT_CONFIG_124M = {',null],
+ ['    "vocab_size": 50257,','詞彙表大小：BPE tokenizer 的 token 總數。模型認得 50257 種 token，輸出層要對這 50257 種可能性打分數。'],
+ ['    "context_length": 1024,','上下文長度：透過 positional embedding，模型一次最多吃 1024 個 token，超過要截斷。'],
+ ['    "emb_dim": 768,','embedding 維度：每個 token 轉成 768 維向量。這個維度貫穿整個模型——不管過幾層，每個 token 都維持 768 維。'],
+ ['    "n_heads": 12,','注意力頭數：768 維切成 12 個頭、每頭 64 維，各自關注不同的關係。'],
+ ['    "n_layers": 12,','transformer block 疊幾層：GPT-2 small 是 12 層；最大的 XL 是 48 層。'],
+ ['    "drop_rate": 0.1,','dropout：訓練時隨機關掉 10% 隱藏單元，逼模型不依賴特定神經元，對抗 overfitting。'],
+ ['    "qkv_bias": False','query/key/value 的 Linear 要不要加 bias。先關（現代 LLM 常見做法）；第 6 章載入 OpenAI 權重時會再回來開。'],
+ ['}',null]];
+$("#cfgLines").innerHTML=CFG.map((c,i)=>`<div class="cl" data-i="${i}" style="cursor:${c[1]?'pointer':'default'}">${c[0]}</div>`).join("");
+$$("#cfgLines .cl").forEach(el=>el.addEventListener("click",()=>{
+  const c=CFG[+el.dataset.i];if(!c[1])return;
+  $$("#cfgLines .cl").forEach(x=>x.classList.remove("lit"));el.classList.add("lit");
+  $("#cfgCap").innerHTML="<b>"+c[0].trim().replace(/,$/,"")+"</b> — "+c[1];
+}));
+
+/* ===== 4.1 batch inspector ===== */
+const BATCH=[
+ {text:'"Every effort moves you"',words:["Every"," effort"," moves"," you"],ids:[6109,3626,6100,345]},
+ {text:'"Every day holds a"',words:["Every"," day"," holds"," a"],ids:[6109,1110,6622,257]}];
+function renderBatch(){
+  $("#batchWords").innerHTML=BATCH.map((s,si)=>
+    `<div style="width:100%;display:flex;gap:7px;align-items:center;flex-wrap:wrap"><span class="small" style="width:56px">txt${si+1} =</span>`+
+    s.words.map((w,wi)=>`<span class="wchip" data-k="${si}-${wi}">${w.trim()}<small>${s.ids[wi]}</small></span>`).join("")+`</div>`).join("");
+  $("#batchTsr").innerHTML=`<span class="lbl"># batch = torch.stack(...)，形狀 [2, 4]</span>\ntensor([<span class="pn">[</span>`+
+    BATCH[0].ids.map((id,i)=>`<span class="tn" data-k="0-${i}">${String(id).padStart(5)}</span>`).join(`<span class="pn">,</span>`)+`<span class="pn">],</span>\n        <span class="pn">[</span>`+
+    BATCH[1].ids.map((id,i)=>`<span class="tn" data-k="1-${i}">${String(id).padStart(5)}</span>`).join(`<span class="pn">,</span>`)+`<span class="pn">]</span>])`;
+  const all=[...$$("#batchWords .wchip"),...$$("#batchTsr .tn")];
+  function hi(k){
+    all.forEach(el=>el.classList.toggle("hot",el.dataset.k===k));
+    if(k){const[si,wi]=k.split("-").map(Number);const s=BATCH[si];
+      $("#batchNote").innerHTML=`<b>"${s.words[wi].trim()}"</b>（第 ${si+1} 句第 ${wi+1} 個 token）↔ token ID <b>${s.ids[wi]}</b>${s.ids[wi]===6109?"　← 兩句的開頭都是 Every，所以 ID 相同":""}`;
+    } else $("#batchNote").textContent="滑過任何一個字或 ID 試試 →";
+  }
+  all.forEach(el=>{el.addEventListener("mouseenter",()=>hi(el.dataset.k));el.addEventListener("mouseleave",()=>hi(null));});
+}
+renderBatch();
+
+/* ===== 4.1 shape explorer ===== */
+const SHAPE_EXP=[
+ ["<b>2</b> — batch 維：一次處理 2 句話。array 最外層有 2 組。",0],
+ ["<b>4</b> — token 維：每句 4 個 token，輸入幾個 token、輸出就有幾條對應向量。",1],
+ ["<b>50257</b> — 詞彙維：每個 token 位置各有一條 50257 個分數（logits），對應詞彙表每個 token「是下一個字」的分數。圖中僅第 1 個位置展示實際的 logits 首尾值，各位置數值不同。",2]];
+function renderSketch(d){
+  const tok=(si,wi,on)=>{const showNums=d===2&&si===0&&wi===0;
+    return `<span class="sk-tok ${d===1&&on?'on':''}"><span class="v ${d===2&&on?'on':''}">${showNums?'[-1.2034, 0.3201, …, -0.4667]':'[…50257 個分數…]'}</span><b style="color:var(--ink)">${BATCH[si].words[wi].trim()}</b></span>`;};
+  $("#shapeSketch").innerHTML=`<div class="sk-batch">`+BATCH.map((s,si)=>
+    `<div class="sk-sentence ${d===0?'on':''}"><span class="sk-l">第 ${si+1} 句 ${d===0?'◀':''}</span>`+
+    s.words.map((w,wi)=>tok(si,wi,true)).join("")+`</div>`).join("")+`</div>`;
+}
+renderSketch(-1);
+$$(".dimchip").forEach(ch=>ch.addEventListener("click",()=>{
+  $$(".dimchip").forEach(x=>x.classList.toggle("on",x===ch));
+  const d=+ch.dataset.d;renderSketch(d);$("#shapeCap").innerHTML=SHAPE_EXP[d][0];
+}));
+
+/* ===== 4.2 資料（書中真實輸出）===== */
+const OUT=[[0.2260,0.3470,0.0000,0.2216,0.0000,0.0000],[0.2133,0.2394,0.0000,0.5198,0.3297,0.0000]];
+const meanArr=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const varArr=(a,unb)=>{const m=meanArr(a);const ss=a.reduce((x,y)=>x+(y-m)**2,0);return ss/(a.length-(unb?1:0));};
+const f4=x=>{const s=x.toFixed(4);return s==="-0.0000"?"0.0000":s;};
+function numSpan(v,extra){return `<span class="tn ${v<0?'neg':''} ${extra||''}">${f4(v)}</span>`;}
+function matHTML(m,rowHi,colHi){
+  return m.map((row,ri)=>`<span class="pn">${ri===0?'tensor([[':'        ['}</span>`+
+    row.map((v,ci)=>numSpan(v,(rowHi===ri||colHi===ci)?"hot":"")).join(`<span class="pn">, </span>`)+
+    `<span class="pn">${ri===m.length-1?']])':'],'}</span>`).join("\n");
+}
+/* dim demo */
+let dimMode=-1;
+function renderDim(){
+  const el=$("#dimTsr");
+  if(dimMode===-1){
+    const means=OUT.map(r=>meanArr(r));
+    el.innerHTML=`<span class="lbl"># out（Linear(5,6)+ReLU 的輸出，2 個樣本 × 6 個特徵）</span>\n`+matHTML(OUT,-2,-2)+
+      `\n\n<span class="lbl"># out.mean(dim=-1, keepdim=True) → 沿「行」方向，每一列各得一個 mean</span>\ntensor([<span class="pn">[</span><span class="tn hot">${f4(means[0])}</span><span class="pn">],</span>\n        <span class="pn">[</span><span class="tn hot">${f4(means[1])}</span><span class="pn">]])</span>  <span class="lbl"># keepdim=True → 保持 2×1 的形狀，方便廣播</span>`;
+    $("#dimNote").innerHTML=`dim=<b>-1</b>（最後一維＝特徵維）：<b>每個樣本各自</b>算統計量——layer norm 用的就是這個方向。之後張量變 3 維 [batch, tokens, emb_dim] 時，dim=-1 依然指 embedding 維，程式不用改。`;
+  }else{
+    const colMeans=OUT[0].map((_,c)=>meanArr(OUT.map(r=>r[c])));
+    el.innerHTML=`<span class="lbl"># out（同一份輸出）</span>\n`+matHTML(OUT,-2,-2)+
+      `\n\n<span class="lbl"># out.mean(dim=0) → 沿「列」方向，每一行各得一個 mean</span>\ntensor([`+colMeans.map(v=>`<span class="tn hot">${f4(v)}</span>`).join(`<span class="pn">, </span>`)+`])`;
+    $("#dimNote").innerHTML=`dim=<b>0</b>（batch 維）：把兩個樣本「同一個特徵」放在一起算——這是 <b>batch normalization</b> 的方向，不是 layer norm 要的。`;
+  }
+}
+$$("#dimSeg button").forEach(b=>b.addEventListener("click",()=>{$$("#dimSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");dimMode=+b.dataset.d;renderDim();}));
+renderDim();
+
+/* layernorm stepper（即時計算）*/
+const LN_STEPS=5;let lnStep=0;
+function renderLN(){
+  const el=$("#lnTsr");const means=OUT.map(meanArr),vars_=OUT.map(r=>varArr(r,true));
+  const sub=OUT.map((r,i)=>r.map(v=>v-means[i]));
+  const norm=sub.map((r,i)=>r.map(v=>v/Math.sqrt(vars_[i])));
+  const nm=norm.map(meanArr),nv=norm.map(r=>varArr(r,true));
+  let html="";
+  if(lnStep>=0){html+=`<span class="lbl"># step 0 — 起點：層輸出 out（ReLU 後全非負）</span>\n`+matHTML(OUT,-2,-2);}
+  if(lnStep>=1){html+=`\n\n<span class="lbl"># step 1 — 每列各算 mean / var（dim=-1, keepdim=True）</span>\nmean = [[${f4(means[0])}], [${f4(means[1])}]]    var = [[${f4(vars_[0])}], [${f4(vars_[1])}]]`;}
+  if(lnStep>=2){html+=`\n\n<span class="lbl"># step 2 — 減掉自己那列的 mean（廣播）</span>\n`+matHTML(sub,-2,-2);}
+  if(lnStep>=3){html+=`\n\n<span class="lbl"># step 3 — 除以 √var → 正規化完成（對照書中輸出 0.6159, 1.4126, −0.8719 …）</span>\n`+matHTML(norm,-2,-2);}
+  if(lnStep>=4){html+=`\n\n<span class="lbl"># step 4 — 驗收：每列 mean ≈ 0、var = 1</span>\nmean = [[${nm[0].toExponential(2)}], [${nm[1].toExponential(2)}]]    var = [[${f4(nv[0])}], [${f4(nv[1])}]]  <span class="lbl"># 本頁 float64 算出 1e-16 級；書中 PyTorch float32 印出 -5.9605e-08——都是浮點誤差下的「幾乎是 0」</span>`;}
+  el.innerHTML=html;
+  const caps=[
+   "<b>起點</b>：torch.randn(2,5) 過 Linear(5,6)+ReLU 的真實輸出。目標：把每一列調成 mean 0 / var 1。",
+   "<b>算統計量</b>：沿 dim=-1 每列各算 mean 與 var；keepdim=True 保持 2×1 形狀，等下才能直接廣播相減。",
+   "<b>置中</b>：每列減掉自己的 mean——現在出現負值了（藍色），每列平均變 0。",
+   "<b>縮放</b>：再除以 √var，讓每列的散佈變成 1。這些數字與書中輸出一致（±0.001 內的四捨五入差）。",
+   "<b>驗收</b>：mean 只剩浮點誤差級的極小值（本頁 float64 約 1e-16；書中 float32 印出 -5.9605e-08）、var 正好 1。LayerNorm 類別再補上可訓練的 scale/shift 與 eps。"];
+  $("#lnCap").innerHTML=caps[lnStep];
+  $("#lnDots").innerHTML=Array.from({length:LN_STEPS},(_,i)=>`<span class="dot2 ${i===lnStep?'on':''}"></span>`).join("");
+  $("#lnPrev").disabled=lnStep===0;$("#lnNext").disabled=lnStep===LN_STEPS-1;
+}
+$("#lnNext").addEventListener("click",()=>{if(lnStep<LN_STEPS-1){lnStep++;renderLN();}});
+$("#lnPrev").addEventListener("click",()=>{if(lnStep>0){lnStep--;renderLN();}});
+renderLN();
+
+/* ===== 4.3 GELU canvas ===== */
+const gcv=$("#geluCv"),gx=gcv.getContext("2d");
+const gelu=x=>0.5*x*(1+Math.tanh(Math.sqrt(2/Math.PI)*(x+0.044715*x**3))),relu=x=>Math.max(0,x);
+function drawGelu(hx){const W=gcv.width,H=gcv.height,pad=32;gx.clearRect(0,0,W,H);const xmin=-3.2,xmax=3.2,ymin=-1.1,ymax=3.2;const X=x=>pad+(x-xmin)/(xmax-xmin)*(W-2*pad),Y=y=>H-pad-(y-ymin)/(ymax-ymin)*(H-2*pad);
+ gx.strokeStyle=css("--line");gx.lineWidth=1;gx.font="10px ui-monospace";gx.fillStyle=css("--faint");
+ for(let g=-3;g<=3;g++){gx.globalAlpha=g===0?.7:.25;gx.beginPath();gx.moveTo(X(g),pad);gx.lineTo(X(g),H-pad);gx.stroke();gx.globalAlpha=1;if(g)gx.fillText(g,X(g)-3,H-pad+14);}
+ for(let g=-1;g<=3;g++){gx.globalAlpha=g===0?.7:.25;gx.beginPath();gx.moveTo(pad,Y(g));gx.lineTo(W-pad,Y(g));gx.stroke();gx.globalAlpha=1;gx.fillText(g,pad-14,Y(g)+3);}
+ gx.strokeStyle=css("--muted");gx.lineWidth=2;gx.beginPath();for(let i=0;i<=200;i++){const x=xmin+(xmax-xmin)*i/200;i?gx.lineTo(X(x),Y(relu(x))):gx.moveTo(X(x),Y(relu(x)));}gx.stroke();
+ gx.strokeStyle=css("--accent");gx.lineWidth=2.6;gx.beginPath();for(let i=0;i<=200;i++){const x=xmin+(xmax-xmin)*i/200;i?gx.lineTo(X(x),Y(gelu(x))):gx.moveTo(X(x),Y(gelu(x)));}gx.stroke();
+ gx.font="12px ui-monospace";gx.fillStyle=css("--accent");gx.fillText("GELU",W-84,pad+4);gx.fillStyle=css("--muted");gx.fillText("ReLU",W-84,pad+20);
+ if(hx!=null){const x=xmin+(xmax-xmin)*(hx-pad)/(W-2*pad);if(x>=xmin&&x<=xmax){gx.strokeStyle=css("--line-strong");gx.setLineDash([4,4]);gx.beginPath();gx.moveTo(X(x),pad);gx.lineTo(X(x),H-pad);gx.stroke();gx.setLineDash([]);gx.fillStyle=css("--accent");gx.beginPath();gx.arc(X(x),Y(gelu(x)),4,0,7);gx.fill();gx.fillStyle=css("--ink");gx.fillText(`x=${x.toFixed(2)}  GELU=${gelu(x).toFixed(3)}  ReLU=${relu(x).toFixed(3)}`,pad+4,pad+12);}}}
+drawGelu();
+gcv.addEventListener("mousemove",e=>{const r=gcv.getBoundingClientRect();drawGelu((e.clientX-r.left)/r.width*gcv.width);});
+gcv.addEventListener("mouseleave",()=>drawGelu());
+
+/* ===== 4.3 FFN flow ===== */
+const FFN=[["輸入 x","[2, 3, 768]",768,"batch 2、每句 3 個 token、每 token 768 維"],
+ ["nn.Linear(768, 3072)","[2, 3, 3072]",3072,"第一個 Linear 把最後一維放大 4 倍：更寬的空間、更多維度可以表達特徵組合"],
+ ["GELU()","[2, 3, 3072]",3072,"在高維空間做非線性加工（形狀不變）"],
+ ["nn.Linear(3072, 768)","[2, 3, 768]",768,"第二個 Linear 收縮回原維度——進 768、出 768，才能無縫堆疊"]];
+let ffnI=-1;
+function renderFFN(){
+  $("#ffnFlow").innerHTML=FFN.map((s,i)=>
+    `<div class="ffnrow ${i<=ffnI?'lit':''}"><span>${s[0]}</span><div class="ffnbar" style="width:${s[2]/3072*100}%">${s[1]}</div></div>`+
+    (i<FFN.length-1?'<div class="ffnarrow">↓</div>':'')).join("");
+  $("#ffnCap").textContent=ffnI>=0?FFN[ffnI][3]:"按「下一步」開始";
+  $("#ffnNext").disabled=ffnI===FFN.length-1;
+}
+$("#ffnNext").addEventListener("click",()=>{ffnI=Math.min(FFN.length-1,ffnI+1);renderFFN();});
+$("#ffnReset").addEventListener("click",()=>{ffnI=-1;renderFFN();});
+renderFFN();
+
+/* ===== 補充：前向×反向（真實計算的小網路）===== */
+const NX=[0.9,-0.4];
+const NW1=[[0.6,-0.4],[0.9,0.3],[-0.7,0.5]],NB1=[0.1,-0.2,0.05];
+const NW2=[0.8,-0.6,0.7],NB2=0.1,TARGET=1.0;
+const z1=NW1.map((r,i)=>r[0]*NX[0]+r[1]*NX[1]+NB1[i]);
+const a1=z1.map(Math.tanh);
+const yhat=NW2.reduce((s,w,i)=>s+w*a1[i],NB2);
+const loss=0.5*(yhat-TARGET)**2;
+const dyhat=yhat-TARGET;
+const da1=NW2.map(w=>w*dyhat);
+const dz1=da1.map((d,i)=>d*(1-a1[i]*a1[i]));
+const dx=[0,1].map(j=>NW1.reduce((s,r,i)=>s+r[j]*dz1[i],0));
+/* ⑤ 真的執行一次權重更新（lr=0.1），並用新權重重跑 forward 驗證 loss 下降 */
+const LR=0.1;
+const W2n=NW2.map((w,i)=>w-LR*dyhat*a1[i]);
+const B2n=NB2-LR*dyhat;
+const W1n=NW1.map((r,i)=>r.map((w,j)=>w-LR*dz1[i]*NX[j]));
+const B1n=NB1.map((b,i)=>b-LR*dz1[i]);
+const a1n=W1n.map((r,i)=>Math.tanh(r[0]*NX[0]+r[1]*NX[1]+B1n[i]));
+const yhat2=W2n.reduce((s,w,i)=>s+w*a1n[i],B2n);
+const loss2=0.5*(yhat2-TARGET)**2;
+const IN=[{x:70,y:120},{x:70,y:200}],HID=[{x:320,y:80},{x:320,y:160},{x:320,y:240}],OUTN={x:520,y:160},LOSS={x:620,y:160};
+const svg=$("#fbSvg");
+let fbMode="fwd",fbStep=0;
+const FWD_CAP=["① 輸入向量 x =[0.9, -0.4] 進場。","② 隱藏層：每個節點把輸入<b>加權求和</b>再過 activation（tanh），得到 3 個值。","③ 輸出層：把隱藏層再加權求和 → <b>預測值 ŷ</b>。","④ 和 target 比較：<b>loss = ½(ŷ − target)²</b>。前向結束。"];
+const BWD_CAP=["① 從 loss 出發：<b>∂L/∂ŷ = ŷ − target = "+dyhat.toFixed(2)+"</b>（預測差多少）。",
+"② 用<b>連鎖律</b>把梯度往回乘，得到每個隱藏節點的梯度。",
+"③ 繼續傳回輸入層，同時得到<b>每個權重的梯度 ∂L/∂W</b>——「該往哪調」。",
+"④ 梯度到齊：每個權重都知道往哪個方向調會讓 loss 變小。4.4 節會看到：這條回傳的路太深時梯度會消失，解方是 shortcut。",
+"⑤ <b>執行更新 W ← W − lr·∂L/∂W</b>（lr=0.1）。例：W₂ ["+NW2.map(x=>x.toFixed(2)).join(", ")+"] → ["+W2n.map(x=>x.toFixed(2)).join(", ")+"]。用新權重重跑 forward：ŷ "+yhat.toFixed(2)+" → "+yhat2.toFixed(2)+"，loss <b>"+loss.toFixed(3)+" → "+loss2.toFixed(3)+"</b> ✓ 下降——這一整圈就是一次完整的「學習」。"];
+const fmt2=x=>(x>=0?"+":"")+x.toFixed(2);
+function drawFB(){
+  const fwd=fbMode==="fwd",st=fbStep,acc=css("--accent"),cool=css("--cool"),col=fwd?acc:cool;
+  let litIn,litHid,litOut,litLoss;
+  if(fwd){litIn=st>=0;litHid=st>=1;litOut=st>=2;litLoss=st>=3;}
+  else{litLoss=true;litOut=st>=0;litHid=st>=1;litIn=st>=2;}
+  let s="";
+  IN.forEach(a=>HID.forEach(b=>{s+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" class="fbe e1"/>`;}));
+  HID.forEach(a=>{s+=`<line x1="${a.x}" y1="${a.y}" x2="${OUTN.x}" y2="${OUTN.y}" class="fbe e2"/>`;});
+  s+=`<line x1="${OUTN.x}" y1="${OUTN.y}" x2="${LOSS.x}" y2="${LOSS.y}" class="fbe e3"/>`;
+  function node(p,val,lit){return `<circle cx="${p.x}" cy="${p.y}" r="22" fill="${lit?col:css('--surface')}" stroke="${lit?col:css('--line')}" stroke-width="1.5"/><text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="${lit?'#fff':css('--faint')}">${val}</text>`;}
+  let n="";
+  IN.forEach((p,i)=>n+=node(p,fwd?NX[i].toFixed(1):fmt2(dx[i]),litIn));
+  HID.forEach((p,i)=>n+=node(p,fwd?a1[i].toFixed(2):fmt2(dz1[i]),litHid));
+  n+=node(OUTN,fwd?yhat.toFixed(2):fmt2(dyhat),litOut);
+  const updated=!fwd&&st>=4;
+  const lossShow=updated?loss2:loss;
+  const lossFill=litLoss?(updated?css('--ok'):css('--bad')):css('--surface');
+  n+=`<rect x="${LOSS.x-24}" y="${LOSS.y-18}" width="52" height="36" rx="7" fill="${lossFill}" stroke="${litLoss?lossFill:css('--line')}"/><text x="${LOSS.x+2}" y="${LOSS.y-2}" text-anchor="middle" font-family="ui-monospace" font-size="9" fill="${litLoss?'#fff':css('--faint')}">loss${updated?'↓':''}</text><text x="${LOSS.x+2}" y="${LOSS.y+11}" text-anchor="middle" font-family="ui-monospace" font-size="10" fill="${litLoss?'#fff':css('--muted')}">${lossShow.toFixed(2)}</text>`;
+  n+=`<text x="70" y="270" text-anchor="middle" font-family="ui-monospace" font-size="10" fill="${css('--faint')}">input x</text><text x="320" y="272" text-anchor="middle" font-family="ui-monospace" font-size="10" fill="${css('--faint')}">hidden (Linear+act)</text><text x="520" y="200" text-anchor="middle" font-family="ui-monospace" font-size="10" fill="${css('--faint')}">ŷ</text>`;
+  svg.innerHTML=s+n;
+  $$(".fbe",svg).forEach(e=>{e.setAttribute("stroke",css("--line-strong"));e.setAttribute("stroke-width","1.4");e.setAttribute("opacity",".5");});
+  const glow=sel=>sel.forEach(e=>{e.setAttribute("stroke",col);e.setAttribute("stroke-width","3");e.setAttribute("opacity","1");});
+  const e1=$$(".e1",svg),e2=$$(".e2",svg),e3=$$(".e3",svg);
+  if(fwd){if(st>=1)glow(e1);if(st>=2)glow(e2);if(st>=3)glow(e3);}
+  else{if(st>=0)glow(e3);if(st>=1)glow(e2);if(st>=2)glow(e1);}
+  $("#fbCap").innerHTML=(fwd?FWD_CAP:BWD_CAP)[st];
+  const nSteps=fwd?4:5;
+  $("#fbDots").innerHTML=Array.from({length:nSteps},(_,i)=>`<span class="dot2 ${i===st?'on':''}"></span>`).join("");
+  $("#fbPrev").disabled=st===0;
+  $("#fbNext").disabled=!fwd&&st===4;
+}
+$$("#fbSeg button").forEach(b=>b.addEventListener("click",()=>{$$("#fbSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");fbMode=b.dataset.p;fbStep=0;drawFB();}));
+$("#fbNext").addEventListener("click",()=>{const max=fbMode==="fwd"?3:4;if(fbStep<max){fbStep++;drawFB();}else if(fbMode==="fwd"){fbMode="bwd";fbStep=0;$$("#fbSeg button").forEach(x=>x.classList.toggle("on",x.dataset.p==="bwd"));drawFB();}});
+$("#fbPrev").addEventListener("click",()=>{if(fbStep>0){fbStep--;drawFB();}});
+drawFB();
+
+/* ===== 4.4 gradients（書中真實輸出）===== */
+const G_OFF=[0.00020173587836325169,0.0001201116101583466,0.0007152041653171182,0.001398873864673078,0.005049646366387606];
+const G_ON=[0.22169792652130127,0.20694105327129364,0.32896995544433594,0.2665732502937317,1.3258541822433472];
+function renderGrad(on){
+  const data=on?G_ON:G_OFF,mx=Math.max(...data);
+  $("#gradViz").innerHTML=data.map((d,i)=>`<div class="grow"><span style="color:var(--faint)">layer ${i}</span><div class="track"><div class="f" style="width:${Math.max(1.5,d/mx*100)}%;background:${on?'var(--accent)':'var(--muted)'}"></div></div><span style="text-align:right;color:var(--muted)">${d.toFixed(6)}</span></div>`).join("");
+  $("#gradPrint").innerHTML=`<span class="lbl"># print_gradients(model_${on?'with':'without'}_shortcut, sample_input) 的輸出</span>\n`+
+    data.map((d,i)=>`layers.${i}.0.weight has gradient mean of <span class="tn" style="color:${on?'var(--accent)':'var(--muted)'}">${d}</span>`).join("\n");
+  $("#gradCap").innerHTML=on
+   ?"<b>有捷徑</b>：最後一層梯度仍最大（1.33），但往前走梯度<b>穩定維持在 0.2 上下</b>——layer 0 從 0.0002 提升到 0.22，差了三個數量級。"
+   :"<b>沒有捷徑</b>：從 layer 4（0.005）往 layer 0（0.0002）梯度愈來愈小——第一層只剩最後一層的約 1/25，這就是 <b>vanishing gradient</b>：早期層幾乎收不到學習訊號。";
+}
+$$("#gSeg button").forEach(b=>b.addEventListener("click",()=>{$$("#gSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");renderGrad(b.dataset.g==="1");}));
+renderGrad(false);
+
+/* ===== 4.5 block stepper ===== */
+const BLK=[
+ ["def forward(self, x):","進入 transformer block。輸入形狀 [2, 4, 768]。",null],
+ ["    shortcut = x","把輸入存起來——待會 attention 做完要加回來（捷徑 ①）。",null],
+ ["    x = self.norm1(x)","Pre-LayerNorm：先把每個 token 的 768 維調成 mean 0 / var 1，再進子層（訓練較穩）。",0],
+ ["    x = self.att(x)","multi-head attention：token 之間交換資訊。每個位置的向量吸收整句脈絡，形狀不變。",1],
+ ["    x = self.drop_shortcut(x)","dropout：訓練時隨機丟棄部分值，正則化。",null],
+ ["    x = x + shortcut","加回捷徑 ①：輸入直接加到輸出，保住梯度的高速公路。",2],
+ ["    shortcut = x","更新捷徑起點，準備第二個子層。",null],
+ ["    x = self.norm2(x)","第二次 Pre-LayerNorm。",3],
+ ["    x = self.ff(x)","feed forward：768→3072→GELU→768，對每個位置獨立加工。",4],
+ ["    x = self.drop_shortcut(x)","dropout。",null],
+ ["    x = x + shortcut","加回捷徑 ②。",5],
+ ["    return x","輸出 [2, 4, 768]——形狀跟輸入一樣，但內容已重新編碼成 context vector。",null]];
+let blkI=-1;
+$("#blkLines").innerHTML=BLK.map((l,i)=>`<div class="cl" data-i="${i}">${l[0]}</div>`).join("");
+function renderBlk(){
+  $$("#blkLines .cl").forEach((el,i)=>el.classList.toggle("lit",i===blkI));
+  $("#blkCap").innerHTML=blkI>=0?("<b>"+BLK[blkI][0].trim()+"</b> — "+BLK[blkI][1]):"👆 按「下一行」逐行執行 TransformerBlock.forward";
+  $("#blkPrev").disabled=blkI<=0;$("#blkNext").disabled=blkI===BLK.length-1;
+  const sub=blkI>=0?BLK[blkI][2]:null;
+  if(sub!==null&&sub!==undefined&&secNow==="sec-45"){$("#mapSub").innerHTML=`Transformer Block 內：<b>${SUBNAMES[sub]}</b>（第 ${blkI+1} 行）`;}
+}
+$("#blkNext").addEventListener("click",()=>{if(blkI<BLK.length-1){blkI++;renderBlk();}});
+$("#blkPrev").addEventListener("click",()=>{if(blkI>0){blkI--;renderBlk();}});
+let secNow="";
+(function trackSec(){const upd=()=>{let cur=secs[0];for(const s of secs)if(s.getBoundingClientRect().top<=150)cur=s;secNow=cur.id;};addEventListener("scroll",upd,{passive:true});upd();})();
+renderBlk();
+
+/* ===== 4.6 calculator ===== */
+const presets={s:{emb:768,lay:12,hed:12},m:{emb:1024,lay:24,hed:16},l:{emb:1280,lay:36,hed:20},xl:{emb:1600,lay:48,hed:25}};
+let tie=false;
+const el={emb:$("#sEmb"),lay:$("#sLay"),hed:$("#sHed"),voc:$("#sVoc")},lab={emb:$("#vEmb"),lay:$("#vLay"),hed:$("#vHed"),voc:$("#vVoc")};
+function calc(){
+  const emb=+el.emb.value,lay=+el.lay.value,voc=+el.voc.value,ctx=1024;
+  for(const k in lab)lab[k].textContent=(+el[k].value).toLocaleString("en-US");
+  const tok=voc*emb,pos=ctx*emb;
+  const attn=3*emb*emb+(emb*emb+emb);                 // qkv 無 bias + out_proj 有 bias
+  const ffn=(emb*4*emb+4*emb)+(4*emb*emb+emb);
+  const ln=4*emb, per=attn+ffn+ln, blocks=lay*per, fn=2*emb, head=tie?0:voc*emb;
+  const total=tok+pos+blocks+fn+head;
+  $("#totNum").textContent=(total/1e6).toFixed(1);
+  $("#totRaw").textContent="M · "+total.toLocaleString("en-US");
+  $("#memMB").textContent=(total*4/1048576).toFixed(2);
+  $("#perBlock").innerHTML=`每個 block：attention <b style="color:var(--accent)">${attn.toLocaleString("en-US")}</b> ＋ feed forward <b style="color:var(--accent)">${ffn.toLocaleString("en-US")}</b> 參數`;
+  const parts=[["Token embedding",tok],["Positional emb",pos],["Transformer ×"+lay,blocks],["Final LayerNorm",fn],["Output head",head]];
+  const mx=Math.max(...parts.map(p=>p[1]),1);
+  $("#brk").innerHTML=parts.map(p=>`<div class="brow"><span>${p[0]}</span><div class="barwrap"><div class="bar" style="width:${p[1]/mx*100}%"></div></div><span class="num">${(p[1]/1e6).toFixed(1)}M</span></div>`).join("");
+  $("#wtShapes").classList.toggle("tied",tie);$("#wtArrow").textContent=tie?"＝共用":"≠";
+  $$(".pill").forEach(b=>{const p=presets[b.dataset.p];b.classList.toggle("on",p&&p.emb===emb&&p.lay===lay&&p.hed===+el.hed.value&&voc===50257&&tie);});
+}
+Object.values(el).forEach(s=>s.addEventListener("input",calc));
+$("#tieSw").addEventListener("click",e=>{tie=!tie;e.currentTarget.classList.toggle("on",tie);calc();});
+$$(".pill").forEach(b=>b.addEventListener("click",()=>{const p=presets[b.dataset.p];el.emb.value=p.emb;el.lay.value=p.lay;el.hed.value=p.hed;el.voc.value=50257;tie=true;$("#tieSw").classList.add("on");calc();}));
+calc();
+
+/* ===== 4.7 decode stepper（書中真實輸出）===== */
+const DEC_START=[15496,11,314,716];
+const DEC_START_W=["Hello",",","I","am"];
+const DEC_NEW=[27018,24086,47843,30961,42348,7267];
+const DEC_PIECES=[" Feature","iman"," Byes","wick","attribute"," argue"];
+let decI=0;
+function renderDec(){
+  const ids=[...DEC_START,...DEC_NEW.slice(0,decI)];
+  $("#decIds").innerHTML=`<span class="small">idx =</span> <span class="small pn">[</span>`+
+    ids.map((id,i)=>{
+      const isNew=i===ids.length-1&&decI>0&&i>=DEC_START.length;
+      const w=i<4?DEC_START_W[i]:DEC_PIECES[i-4].trim();
+      return `<span class="did ${isNew?'new':''}">${id}<small>${w}</small></span>`;
+    }).join("")+`<span class="small pn">]</span> <span class="small">共 ${ids.length} 個</span>`;
+  const decoded="Hello, I am"+DEC_PIECES.slice(0,decI).join("");
+  const prev="Hello, I am"+DEC_PIECES.slice(0,Math.max(0,decI-1)).join("");
+  const nw=decoded.slice(prev.length);
+  $("#decText").innerHTML=`<span class="small lbl">tokenizer.decode(idx) → </span>"${prev}<span class="nw">${nw}</span>"`;
+  const caps=[
+   "起點：\"Hello, I am\" 被編碼成 4 個 token ID。unsqueeze(0) 加上 batch 維 → 形狀 [1, 4]。",
+   "第 1 步：模型輸出 [1, 4, 50257]，只取最後一格 logits[:, -1, :]，argmax 選出 ID 27018，接回序列。",
+   "第 2 步：現在輸入 5 個 token，一樣只看最後一格的預測 → 24086。",
+   "第 3 步：→ 47843。注意每一輪整個序列都會重新過一次模型。",
+   "第 4 步：→ 30961。context 一輪比一輪長，這正是「接龍」的機制。",
+   "第 5 步：→ 42348。",
+   "完成：共 10 個 token。解碼結果語無倫次——因為權重是隨機的，模型根本還沒學過語言。第 5 章訓練後再回來看它變聰明。"];
+  $("#decCap").innerHTML=caps[decI];
+  $("#decDots").innerHTML=Array.from({length:7},(_,i)=>`<span class="dot2 ${i===decI?'on':''}"></span>`).join("");
+  $("#decNext").disabled=decI===6;
+}
+$("#decNext").addEventListener("click",()=>{if(decI<6){decI++;renderDec();}});
+$("#decAll").addEventListener("click",()=>{decI=6;renderDec();});
+$("#decReset").addEventListener("click",()=>{decI=0;renderDec();});
+renderDec();
+
+/* ===== 4.1 word→ID→embedding 動畫 ===== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const W2E=[["Every",6109],["effort",3626],["moves",6100],["you",345]];
+let w2eSel=2,w2eTimer=null,w2eTyper=null;
+const w2eReduced=matchMedia("(prefers-reduced-motion:reduce)").matches;
+function w2eVals(id){const r=mulberry32(id*2654435761>>>0);return Array.from({length:6},()=>(r()*2-1).toFixed(4));}
+function w2eRender(step){
+  $$("#w2e .stg").forEach(el=>el.classList.toggle("lit",+el.dataset.s<=step));
+  const pair=W2E[w2eSel];
+  $("#w2eWord").textContent=pair[0];$("#w2eId").textContent=pair[1];
+  $("#w2eTable").innerHTML=[pair[1]-2,pair[1]-1,pair[1],pair[1]+1,pair[1]+2].map(r=>`<tr class="${r===pair[1]?'hit':''}"><td>row ${r}</td><td>${r===pair[1]?'← 取這一列':'…'}</td></tr>`).join("");
+  if(step<3)$("#w2eVec").textContent="";
+}
+function w2eType(){
+  const vals=w2eVals(W2E[w2eSel][1]);let k=0;
+  if(w2eReduced){$("#w2eVec").textContent="[ "+vals.join(", ")+", … ]";return;}
+  $("#w2eVec").textContent="[ ";
+  w2eTyper=setInterval(()=>{
+    if(k<vals.length){$("#w2eVec").textContent+=(k?", ":"")+vals[k];k++;}
+    else{$("#w2eVec").textContent+=", … ]";clearInterval(w2eTyper);w2eTyper=null;}
+  },110);
+}
+function w2eGo(){
+  if(w2eTimer){clearInterval(w2eTimer);w2eTimer=null;}
+  if(w2eTyper){clearInterval(w2eTyper);w2eTyper=null;}
+  if(w2eReduced){w2eRender(3);w2eType();return;}
+  let s=0;w2eRender(0);
+  w2eTimer=setInterval(()=>{s++;w2eRender(s);if(s>=3){clearInterval(w2eTimer);w2eTimer=null;w2eType();}},650);
+}
+$("#w2eWords").innerHTML=W2E.map((x,i)=>`<button class="pill ${i===w2eSel?'on':''}" data-i="${i}" style="margin-right:6px">${x[0]}</button>`).join("");
+$$("#w2eWords .pill").forEach(b=>b.addEventListener("click",()=>{w2eSel=+b.dataset.i;$$("#w2eWords .pill").forEach(x=>x.classList.toggle("on",x===b));w2eGo();}));
+$("#w2ePlay").addEventListener("click",w2eGo);
+w2eRender(3);w2eType();
+
+/* ===== 4.2 互動①：訊號燈條（真實矩陣模擬）===== */
+const GL_N=24,GL_L=30;
+const glRand=mulberry32(777);
+function gauss(){let u=0,v=0;while(u===0)u=glRand();while(v===0)v=glRand();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const GL_W=Array.from({length:GL_L},()=>Array.from({length:GL_N},()=>Array.from({length:GL_N},()=>gauss()/Math.sqrt(GL_N))));
+const GL_X0=(()=>{const x=Array.from({length:GL_N},()=>gauss());const r=Math.sqrt(x.reduce((s,v)=>s+v*v,0)/GL_N);return x.map(v=>v/r);})();
+function glSim(s,useLN){
+  let x=GL_X0.slice();const rms=[1];
+  for(let l=0;l<GL_L;l++){
+    const y=new Array(GL_N).fill(0);
+    for(let i=0;i<GL_N;i++){let acc=0;const Wr=GL_W[l][i];for(let j=0;j<GL_N;j++)acc+=Wr[j]*x[j];y[i]=acc*s;}
+    if(useLN){const m=y.reduce((a,b)=>a+b,0)/GL_N;let v=0;for(let i=0;i<GL_N;i++)v+=(y[i]-m)**2;v/=GL_N;const sd=Math.sqrt(v+1e-9);for(let i=0;i<GL_N;i++)y[i]=(y[i]-m)/sd;}
+    x=y;rms.push(Math.sqrt(x.reduce((a,b)=>a+b*b,0)/GL_N));
+  }
+  return rms;
+}
+function sigDots(el,arr){
+  el.innerHTML=arr.slice(1).map(r=>{
+    if(r>=1e3)return `<span class="sigd boom" style="width:18px;height:18px" title="${r.toExponential(1)}"></span>`;
+    const d=Math.max(2,Math.min(18,18*r));
+    return `<span class="sigd" style="width:${d.toFixed(1)}px;height:${d.toFixed(1)}px" title="${r.toExponential(2)}"></span>`;
+  }).join("");
+}
+function drawSig(){
+  const s=parseFloat($("#glSlider").value);$("#glVal").textContent=s.toFixed(2);
+  const no=glSim(s,false),ln=glSim(s,true);
+  sigDots($("#sigNo"),no);sigDots($("#sigLn"),ln);
+  const last=no[GL_L];
+  $("#sigNoOut").innerHTML=last>=1e3?`第 30 層：<span class="bad">💥 ${last.toExponential(1)}（溢位）</span>`:last<1e-3?`第 30 層：<span class="bad">≈ 0（${last.toExponential(1)}，訊號沒了）</span>`:`第 30 層：<b>${last.toFixed(2)}</b>`;
+  $("#sigLnOut").innerHTML=`第 30 層：<b>${ln[GL_L].toFixed(2)}</b>（穩定）`;
+  const pow30=Math.pow(s,30);
+  $("#glCap").innerHTML=s<0.95?`s=${s.toFixed(2)} &lt; 1：每過一層就乘一次 ${s.toFixed(2)}，30 層＝乘了 ${s.toFixed(2)}³⁰ ≈ <b>${pow30.toExponential(1)}</b>——訊號<b>幾乎歸零</b>，後面的層根本收不到東西（vanishing）。下排加了 LayerNorm，每層校準回原大小。`:s>1.05?`s=${s.toFixed(2)} &gt; 1：每過一層就乘一次 ${s.toFixed(2)}，30 層＝乘了 ${s.toFixed(2)}³⁰ ≈ <b>${pow30.toExponential(1)}</b> 倍——很快<b>爆掉變紅</b>（exploding，實務上就是 NaN）。下排加了 LayerNorm 依然穩定。`:`s≈1：不放大也不縮小，剛好撐得住——但權重是初始化與訓練自然形成的，不可能一直恰好停在這個臨界點，所以需要 LayerNorm 保險。`;
+}
+$("#glSlider").addEventListener("input",drawSig);
+drawSig();
+
+/* ===== 4.2 互動②：真實訓練 300 步（6 層小網路，真 forward/backward/更新）===== */
+function trainSim(gain,useLN,seed){
+  const R=mulberry32(seed);const g2=()=>{let u=0,v=0;while(!u)u=R();while(!v)v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+  const N=10,L=6,STEPS=300,LR=0.05,eps=1e-5;
+  const X=[],Y=[];for(let i=0;i<24;i++){const x=-2+4*i/23;X.push(x);Y.push(Math.sin(2*x));}
+  const Win=Array.from({length:N},()=>g2()*gain);const bin=new Array(N).fill(0);
+  const Ws=Array.from({length:L},()=>Array.from({length:N},()=>Array.from({length:N},()=>g2()*gain/Math.sqrt(N))));
+  const bs=Array.from({length:L},()=>new Array(N).fill(0));
+  const Wout=Array.from({length:N},()=>g2()*gain/Math.sqrt(N));let bout=0;
+  const lnF=x=>{const m=x.reduce((a,b)=>a+b,0)/x.length;let v=0;for(const t of x)v+=(t-m)**2;v/=x.length;const sd=Math.sqrt(v+eps);return {y:x.map(t=>(t-m)/sd),sd};};
+  const lnB=(dy,y,sd)=>{const n=y.length;const mdy=dy.reduce((a,b)=>a+b,0)/n;let myy=0;for(let i=0;i<n;i++)myy+=dy[i]*y[i];myy/=n;return y.map((yi,i)=>(dy[i]-mdy-yi*myy)/sd);};
+  const losses=[];
+  for(let step=0;step<STEPS;step++){
+    const gWin=new Array(N).fill(0),gbin=new Array(N).fill(0);
+    const gWs=Ws.map(Wl=>Wl.map(r=>r.map(()=>0)));const gbs=bs.map(b=>b.map(()=>0));
+    const gWout=new Array(N).fill(0);let gbout=0;let loss=0;
+    for(let s=0;s<X.length;s++){
+      const acts=[];const lns=[];
+      let pre0=new Array(N);for(let i=0;i<N;i++)pre0[i]=Win[i]*X[s]+bin[i];
+      let h=pre0.map(v=>Math.max(0,v));acts.push({pre:pre0});
+      for(let l=0;l<L;l++){
+        let inp=h,rec=null;
+        if(useLN){const r=lnF(h);rec=r;inp=r.y;}
+        lns.push(rec);
+        const pre=new Array(N).fill(0);
+        for(let i=0;i<N;i++){let a=bs[l][i];for(let j=0;j<N;j++)a+=Ws[l][i][j]*inp[j];pre[i]=a;}
+        acts.push({pre,inp});
+        h=pre.map(v=>Math.max(0,v));
+      }
+      let yh=bout;for(let i=0;i<N;i++)yh+=Wout[i]*h[i];
+      const err=yh-Y[s];loss+=err*err;
+      let dyh=2*err/X.length;
+      for(let i=0;i<N;i++)gWout[i]+=dyh*h[i];gbout+=dyh;
+      let dh=Wout.map(w=>w*dyh);
+      for(let l=L-1;l>=0;l--){
+        const A=acts[l+1];
+        const dpre=dh.map((d,i)=>A.pre[i]>0?d:0);
+        for(let i=0;i<N;i++){gbs[l][i]+=dpre[i];for(let j=0;j<N;j++)gWs[l][i][j]+=dpre[i]*A.inp[j];}
+        let dinp=new Array(N).fill(0);
+        for(let j=0;j<N;j++){let a=0;for(let i=0;i<N;i++)a+=Ws[l][i][j]*dpre[i];dinp[j]=a;}
+        if(useLN){const r=lns[l];dinp=lnB(dinp,r.y,r.sd);}
+        dh=dinp;
+      }
+      const dpre0=dh.map((d,i)=>acts[0].pre[i]>0?d:0);
+      for(let i=0;i<N;i++){gbin[i]+=dpre0[i];gWin[i]+=dpre0[i]*X[s];}
+    }
+    loss/=X.length;losses.push(loss);
+    if(!isFinite(loss))break;
+    for(let i=0;i<N;i++){Win[i]-=LR*gWin[i];bin[i]-=LR*gbin[i];Wout[i]-=LR*gWout[i];}
+    bout-=LR*gbout;
+    for(let l=0;l<L;l++)for(let i=0;i<N;i++){bs[l][i]-=LR*gbs[l][i];for(let j=0;j<N;j++)Ws[l][i][j]-=LR*gWs[l][i][j];}
+  }
+  return losses;
+}
+const TL_V=trainSim(0.3,false,11),TL_E=trainSim(3.0,false,22),TL_LN=trainSim(3.0,true,33);
+const tlCv=$("#tlCv"),tlx=tlCv.getContext("2d");
+function drawTL(){
+  const W=tlCv.width,H=tlCv.height,pad=46;
+  tlx.clearRect(0,0,W,H);
+  const X=st=>pad+st/300*(W-2*pad),Y=r=>H-pad-Math.max(0,Math.min(2,r))/2*(H-2*pad);
+  tlx.strokeStyle=css("--line");tlx.font="10px ui-monospace";tlx.fillStyle=css("--faint");tlx.lineWidth=1;
+  for(const g of [0,0.5,1,1.5,2]){tlx.globalAlpha=g===1?.6:.28;tlx.beginPath();tlx.moveTo(pad,Y(g));tlx.lineTo(W-pad,Y(g));tlx.stroke();tlx.globalAlpha=1;tlx.fillText(g.toFixed(1),10,Y(g)+3);}
+  for(let st=0;st<=300;st+=50)tlx.fillText(st,X(st)-8,H-pad+14);
+  tlx.fillText("訓練步數 →",W/2-24,H-6);
+  tlx.fillText("loss（相對起點，1.0 = 開始時）",pad,16);
+  function curve(data,color,wd){
+    const base=data[0];tlx.strokeStyle=color;tlx.lineWidth=wd;tlx.beginPath();let exited=null;
+    data.forEach((v,st)=>{const r=v/base;if(!isFinite(r)||r>2.05){if(exited===null)exited=st;return;}
+      st===0?tlx.moveTo(X(st),Y(r)):tlx.lineTo(X(st),Y(r));});
+    tlx.stroke();return exited;
+  }
+  curve(TL_V,css("--muted"),2.2);
+  curve(TL_LN,css("--accent"),2.6);
+  const ex=curve(TL_E,css("--bad"),2.6);
+  if(ex!==null||TL_E.length<300){
+    const bx=X(Math.max(1,TL_E.length-1));
+    tlx.font="16px ui-monospace";tlx.fillText("💥",bx-6,Y(2)-8);
+    tlx.font="11px ui-monospace";tlx.fillStyle=css("--bad");tlx.fillText("NaN！",bx+12,Y(2)-6);
+  }
+  tlx.font="12px ui-monospace";
+  tlx.fillStyle=css("--muted");tlx.fillText("s=0.3 梯度消失 → loss 卡住",W-pad-216,30);
+  tlx.fillStyle=css("--bad");tlx.fillText("s=3.0 梯度爆炸 → NaN 💥",W-pad-216,48);
+  tlx.fillStyle=css("--accent");tlx.fillText("s=3.0＋LayerNorm → 順利下降",W-pad-216,66);
+  const vEnd=TL_V[TL_V.length-1],lnEnd=TL_LN[TL_LN.length-1],ln0=TL_LN[0];
+  $("#tlCap").innerHTML=`真實結果——<b style="color:var(--muted)">初始權重太小（s=0.3）</b>：300 步後 loss ${TL_V[0].toFixed(2)} → ${vEnd.toFixed(2)}，<b>完全卡住</b>；<b style="color:var(--bad)">初始權重太大（s=3.0）</b>：第 ${TL_E.length-1} 步就變 <b>NaN</b>，訓練炸掉；<b style="color:var(--accent)">同樣 s=3.0 但每層加 LayerNorm</b>：loss ${ln0.toFixed(2)} → ${lnEnd.toFixed(2)} ✓ 順利學習。`;
+}
+drawTL();
+
+/* ===== 4.3 dying ReLU vs GELU（真實導數計算）===== */
+const DR_N=24;
+const drRand=mulberry32(4242);
+const DR_BASE=Array.from({length:DR_N},(_,i)=>-2.4+4.8*i/(DR_N-1)+(drRand()-0.5)*0.3);
+function geluPrime(x){const c=Math.sqrt(2/Math.PI);const u=c*(x+0.044715*x**3);const t=Math.tanh(u);const du=c*(1+3*0.044715*x*x);return 0.5*(1+t)+0.5*x*(1-t*t)*du;}
+function drawDR(){
+  const b=parseFloat($("#drSlider").value);$("#drVal").textContent=(b>=0?"+":"")+b.toFixed(1);
+  const pos=z=>((Math.max(-4,Math.min(4,z))+4)/8*100).toFixed(2)+"%";
+  let deadR=0;
+  $("#drRelu").innerHTML='<div class="zero"></div>'+DR_BASE.map(z0=>{const z=z0+b;const alive=z>0;if(!alive)deadR++;
+    return `<span class="zdot ${alive?'':'dead'}" style="left:${pos(z)};${alive?'background:color-mix(in srgb, var(--cool) 80%, transparent);border-color:var(--cool)':''}" title="z=${z.toFixed(2)}, grad=${alive?1:0}">${alive?'':'✕'}</span>`;}).join("");
+  let deadG=0,minG=1;
+  $("#drGelu").innerHTML='<div class="zero"></div>'+DR_BASE.map(z0=>{const z=z0+b;const g=geluPrime(z);const a=Math.abs(g);if(a<1e-4)deadG++;if(a<minG)minG=a;
+    return `<span class="zdot" style="left:${pos(z)};background:color-mix(in srgb, var(--accent) ${Math.round(Math.min(1,a)*90)}%, transparent);border-color:var(--accent-soft)" title="z=${z.toFixed(2)}, grad=${g.toFixed(4)}"></span>`;}).join("");
+  $("#drReluN").innerHTML=`掉進負區、梯度=0：<span class="bad">${deadR} / ${DR_N} 死亡</span>`;
+  $("#drGeluN").innerHTML=`梯度仍非零：<b>${DR_N-deadG} / ${DR_N} 存活</b>`;
+  $("#drCap").innerHTML=b<=-1.2
+    ?`往負向推了 <b>${b.toFixed(1)}</b>：ReLU 那排已有 <b style="color:var(--bad)">${deadR} 顆</b>越過生死線變 ✕——輸出 0、梯度 0，權重不再更新，<b>永遠留在負區</b>。GELU 那排顏色變淡（梯度變小）但仍非零，訓練還能把它們慢慢拉回右邊。`
+    :`拖動滑桿把神經元往左推（模擬訓練中 z 的漂移）。顏色深淺＝梯度大小（真實導數計算）；注意 ReLU 一越過 0 就立刻變 ✕，GELU 則是平滑變淡。`;
+}
+$("#drSlider").addEventListener("input",drawDR);
+drawDR();
+
+/* ===== quiz ===== */
+const quiz=[
+ {q:"GPT_CONFIG_124M 裡 emb_dim=768 代表什麼？",o:["模型層數","每個 token 被表示成 768 維向量，且貫穿全模型","詞彙表大小","batch 大小"],a:1,e:"emb_dim 是嵌入維度：每個 token → 768 維向量，不管過幾層都維持 768 維；層數是 n_layers、詞彙表是 vocab_size。"},
+ {q:"輸出 torch.Size([2, 4, 50257]) 的三個維度依序是？",o:["層數 / 頭數 / 詞彙","batch（2 句）/ token 數（每句 4 個）/ 詞彙表分數","詞彙 / token / batch","高 / 寬 / 深"],a:1,e:"2＝batch、4＝每句 token 數（輸入幾個輸出就幾條）、50257＝對詞彙表每個 token 的 logits。"},
+ {q:"LayerNorm 用 unbiased=False（分母 n 而非 n−1）的主要理由是？",o:["算得比較快","數學上更正確","與 TensorFlow 實作的原始 GPT-2 相容，才能載入其預訓練權重","省記憶體"],a:2,e:"emb_dim 大到 n 與 n−1 差異可忽略；關鍵是原始 GPT-2 用 TensorFlow（預設如此），設定相同第 6 章才能無縫載入權重。"},
+ {q:"5 層網路實驗中，關掉 shortcut 時 layer 0 的梯度約是多少？",o:["約 0.22","約 0.0002（幾乎消失）","正好 0","約 1.33"],a:1,e:"無捷徑時 layer 0 梯度約 0.0002、有捷徑約 0.22——差三個數量級，這就是 shortcut 對抗 vanishing gradient 的實證。"},
+ {q:"我們的 GPTModel 有 163M 參數，GPT-2 official 卻是 124M，因為？",o:["我們多疊了幾層","weight tying：GPT-2 讓輸出層共用 token embedding 權重（省 50257×768≈38.6M）","dropout 也算參數","計算錯誤"],a:1,e:"兩層形狀都是 [50257, 768]、互為反向操作，GPT-2 讓它們共用同一份權重：163,009,536 − 38,597,376 = 124,412,160。"},
+ {q:"generate_text_simple 為什麼「可以」跳過 softmax 直接 argmax？",o:["因為 softmax 太慢","因為 softmax 是單調函數，不改變大小順序，最大值位置相同","因為 logits 已經是機率","不能跳過，會錯"],a:1,e:"softmax 單調：logits 最大值的位置＝softmax 後最大值的位置。書中保留 softmax 是為了完整展示 logits→機率的過程。"}];
+const qc=$("#quizBox");let ans=0,cor=0;
+quiz.forEach((it,qi)=>{const w=document.createElement("div");w.className="q";w.innerHTML=`<div class="qn">Q${qi+1} / ${quiz.length}</div><div class="qt">${it.q}</div>`;
+ it.o.forEach((o,oi)=>{const b=document.createElement("button");b.className="opt";b.innerHTML=o+'<span class="mk"></span>';
+  b.addEventListener("click",()=>{if(w.dataset.done)return;w.dataset.done=1;ans++;const ok=oi===it.a;if(ok)cor++;b.classList.add(ok?"correct":"wrong");b.querySelector(".mk").textContent=ok?"✓":"✗";if(!ok){const cb=w.querySelectorAll(".opt")[it.a];cb.classList.add("correct");cb.querySelector(".mk").textContent="✓";}w.querySelector(".exp").classList.add("show");if(ans===quiz.length)$("#score").textContent=`完成 ✓ 答對 ${cor} / ${quiz.length} 題`;});
+  w.appendChild(b);});
+ const ex=document.createElement("div");ex.className="exp";ex.textContent="▸ "+it.e;w.appendChild(ex);qc.appendChild(w);});
+
+/* 主題切換重繪（含 OS 層級的 prefers-color-scheme 變化） */
+new MutationObserver(()=>{drawGelu();drawFB();drawTL();}).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{drawGelu();drawFB();drawTL();});
+})();
+</script>
+</body>
+</html>
