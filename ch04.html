@@ -352,6 +352,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1p
         <div class="stepcap" id="shapeCap">👆 點一個維度</div>
       </div>
       <div class="note"><b>關鍵：</b>輸入幾個 token，輸出就有幾個對應向量——模型對<strong>每一個位置</strong>都給出「下一個 token 是誰」的 50257 個分數（logits，尚未過 softmax）。生成時我們只取最後一個位置的那條。</div>
+      <div class="note"><b>常見疑問：那前面位置的 logits 要拿去 argmax 嗎？</b>不用——前面位置的字<strong>已經固定</strong>（它們就是輸入本身），生成時只對最後一格做 argmax，早期位置的 logits 直接丟棄。那幹嘛算它們？<b>①</b> transformer 是一次矩陣運算算完所有位置，各位置 logits 是同一次計算順便掉出來的；<b>②</b> 真正的主場在<strong>訓練</strong>：每個位置都是一筆「預測下一個字」的訓練樣本——4 個 token 一次 forward 就得到 4 筆監督訊號（第 5 章的 loss 正是對所有位置一起算），這是 GPT 訓練效率高的關鍵。</div>
     </section>
 
     <!-- ===== 4.2 ===== -->
@@ -1030,7 +1031,7 @@ function renderDec(){
    "起點：\"Hello, I am\" 被編碼成 4 個 token ID。unsqueeze(0) 加上 batch 維 → 形狀 [1, 4]。",
    "第 1 步：模型輸出 [1, 4, 50257]，只取最後一格 logits[:, -1, :]，argmax 選出 ID 27018，接回序列。",
    "第 2 步：現在輸入 5 個 token，一樣只看最後一格的預測 → 24086。",
-   "第 3 步：→ 47843。注意每一輪整個序列都會重新過一次模型。",
+   "第 3 步：→ 47843。注意這個簡化版每一輪都把整個序列重新過一次模型、只用最後一格的 logits（實務引擎用 KV cache 只算新 token 那格，避免重算）。",
    "第 4 步：→ 30961。context 一輪比一輪長，這正是「接龍」的機制。",
    "第 5 步：→ 42348。",
    "完成：共 10 個 token。解碼結果語無倫次——因為權重是隨機的，模型根本還沒學過語言。第 5 章訓練後再回來看它變聰明。"];
