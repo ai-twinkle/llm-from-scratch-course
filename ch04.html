@@ -531,7 +531,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1p
     <section id="sec-46" data-map="s-emb,s-block,s-fnorm,s-head">
       <div class="sh"><span class="num">4.6</span><h2>Coding the GPT model（實作完整 GPT）</h2></div>
       <div class="iocard"><span class="io in">input：token IDs<br>[batch, tokens]</span><span class="ioarrow">→</span><span class="io box">GPTModel<small>tok+pos embedding → dropout → 12×TransformerBlock → final LN → linear head</small></span><span class="ioarrow">→</span><span class="io out">output：logits<br>[batch, tokens, 50257]</span></div>
-      <p>把骨架裡的假模組換成真貨，就是完整的 <code class="inl">GPTModel</code>：embedding → <strong>12× TransformerBlock</strong> → final LayerNorm → linear output head。輸出形狀依然 <code class="inl">[2, 4, 50257]</code>。</p>
+      <p>把骨架裡的假模組換成真貨，就是完整的 <code class="inl">GPTModel</code>：embedding → <strong>12× TransformerBlock</strong> → final LayerNorm → linear output head。輸出形狀依然 <code class="inl">[2, 4, 50257]</code>——複習一下這三個數字：<b>2</b>＝batch（一次餵了 2 句話）、<b>4</b>＝每句 4 個 token、<b>50257</b>＝每個 token 位置對詞彙表全部 50257 個字各給一個分數（logits）。也就是「2 句 × 每句 4 個位置 × 每個位置一整排『下一個字是誰』的評分」（<a href="#sec-41">回 4.1 的維度互動</a>）。</p>
       <pre>self.trf_blocks = nn.Sequential(
     *[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])   <span class="c"># 這次是真的 12 層</span>
 self.final_norm = LayerNorm(cfg["emb_dim"])
