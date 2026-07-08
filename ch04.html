@@ -174,6 +174,16 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;bac
 .decoded{font-family:var(--mono);font-size:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;min-height:44px}
 .decoded .nw{color:var(--accent);font-weight:700}
 .note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--accent-ghost);border-radius:0 8px 8px 0;padding:12px 15px;margin:16px 0;max-width:var(--read);font-size:14px;color:var(--muted)}.note b{color:var(--accent)}
+/* causal mask 互動表 */
+.cmwrap{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
+@media(max-width:760px){.cmwrap{grid-template-columns:1fr}}
+.cmtable{border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+.cmtable th,.cmtable td{border:1px solid var(--line);padding:8px 14px;text-align:center}
+.cmtable th{color:var(--muted);font-weight:600;background:var(--surface-2);font-size:11.5px}
+.cmtable td.ok{color:var(--accent);font-weight:700}
+.cmtable td.no{color:var(--faint);background:repeating-linear-gradient(45deg,transparent,transparent 4px,var(--line) 4px,var(--line) 5px)}
+.cmtable tr.hot td{outline:2px solid var(--accent);outline-offset:-2px}
+.cmtable tr.hot th{color:var(--accent);font-weight:700}
 /* 訓練/推論 模式徽章 */
 .mode{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;vertical-align:3px;margin-left:10px;white-space:nowrap}
 .mode.train{background:color-mix(in srgb,var(--cool) 16%,transparent);color:var(--cool);border:1px solid var(--cool)}
@@ -359,6 +369,18 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1p
       </div>
       <div class="note"><b>關鍵：</b>輸入幾個 token，輸出就有幾個對應向量——模型對<strong>每一個位置</strong>都給出「下一個 token 是誰」的 50257 個分數（logits，尚未過 softmax）。生成時我們只取最後一個位置的那條。</div>
       <div class="note"><b>常見疑問：那前面位置的 logits 要拿去 argmax 嗎？</b><span class="mode infer">💬 推論</span>時不用——前面位置的字<strong>已經固定</strong>（它們就是輸入本身），只對最後一格做 argmax，早期位置的 logits 直接丟棄。那幹嘛算它們？<b>①</b> transformer 是一次矩陣運算算完所有位置，各位置 logits 是同一次計算順便掉出來的；<b>②</b> 真正的主場在<span class="mode train">🏋️ 訓練</span>：每個位置都是一筆「預測下一個字」的訓練樣本——4 個 token 一次 forward 就得到 4 筆監督訊號（第 5 章的 loss 正是對所有位置一起算），這是 GPT 訓練效率高的關鍵。</div>
+
+      <h3>深入：為什麼能一次算 4 個位置，又不會「偷看未來」？（causal mask）<span class="mode train">🏋️ 訓練</span></h3>
+      <p>雖然整句 token 是<strong>一起</strong>送進 transformer 做一次矩陣運算，但 <span class="en">causal mask</span> 讓每個位置的 hidden state <strong>只能利用自己與前面的 token</strong>——所以它產生的 logits 從未看過未來。<strong>點一個位置</strong>，看它的視野和它在回答的問題：</p>
+      <div class="plain"><div class="ph">🔰 考場比喻</div><p>把 4 個位置想成同一間考場的 4 個學生：大家<strong>同時開考</strong>（一次矩陣運算），但監考老師（causal mask）規定——第 1 位只能看自己的考卷、第 2 位能看第 1~2 位、第 3 位能看前三位、第 4 位能看全部。<strong>沒有任何人能偷看「未來的答案」</strong>。這就是為什麼訓練時整句平行輸入，學到的能力和推論時「一步一步往後生成」完全一致。</p></div>
+      <div class="stage">
+        <div class="controls"><span class="small">點一個位置（query）：</span><span id="cmChips"></span></div>
+        <div class="cmwrap">
+          <table class="cmtable" id="cmTable"></table>
+          <div class="tsr" id="cmSide"></div>
+        </div>
+        <div class="stepcap" id="cmCap"></div>
+      </div>
     </section>
 
     <!-- ===== 4.2 ===== -->
@@ -786,6 +808,35 @@ $$(".dimchip").forEach(ch=>ch.addEventListener("click",()=>{
   $$(".dimchip").forEach(x=>x.classList.toggle("on",x===ch));
   const d=+ch.dataset.d;renderSketch(d);$("#shapeCap").innerHTML=SHAPE_EXP[d][0];
 }));
+
+/* ===== 4.1 causal mask：一次算全部位置、但不偷看未來 ===== */
+const CM_TOKS=["Every","effort","moves","you"];
+const CM_TGT=["effort","moves","you","forward"];
+let cmSel=1;
+function renderCM(){
+  $("#cmChips").innerHTML=CM_TOKS.map((t,i)=>`<button class="pill ${i===cmSel?'on':''}" data-i="${i}" style="margin-right:6px">${i+1}·${t}</button>`).join("");
+  $$("#cmChips .pill").forEach(b=>b.addEventListener("click",()=>{cmSel=+b.dataset.i;renderCM();}));
+  let t=`<tr><th>Query＼Key</th>`+CM_TOKS.map(k=>`<th>${k}</th>`).join("")+`</tr>`;
+  for(let q=0;q<4;q++){
+    t+=`<tr class="${q===cmSel?'hot':''}"><th>${q+1}·${CM_TOKS[q]}</th>`+CM_TOKS.map((_,k)=>`<td class="${k<=q?'ok':'no'}">${k<=q?'✓':'✗'}</td>`).join("")+`</tr>`;
+  }
+  $("#cmTable").innerHTML=t;
+  const seen=CM_TOKS.slice(0,cmSel+1);
+  const unseen=CM_TOKS.slice(cmSel+1);
+  $("#cmSide").innerHTML=
+`<span class="lbl"># position ${cmSel+1} 的 hidden state：</span>
+h<sub>${cmSel+1}</sub> = Transformer( ${seen.join(", ")} )${unseen.length?`   <span class="lbl">← 完全不知道 ${unseen.join("、")} 的存在</span>`:`   <span class="lbl">← 看得到整句</span>`}
+
+      ↓ linear output head
+
+logits<sub>${cmSel+1}</sub>（50257 個分數）在回答：
+<b style="color:var(--accent)">「只看到『${seen.join(" ")}』，下一個字是？」</b>
+
+<span class="lbl"># 訓練 target（右移一格的序列）：</span>
+target<sub>${cmSel+1}</sub> = <b style="color:var(--accent)">${CM_TGT[cmSel]}</b>   <span class="lbl">← cross-entropy 直接拿 logits${cmSel+1} 和它比較</span>`;
+  $("#cmCap").innerHTML=`4 個位置是<b>同一次矩陣運算</b>平行算出來的，不是一個接一個。mask 讓每列視野不同：h₁←token 1、h₂←token 1~2、h₃←token 1~3、h₄←token 1~4——一次 forward 就得到 4 筆「預測下一個字」的訓練樣本。`;
+}
+renderCM();
 
 /* ===== 4.2 資料（書中真實輸出）===== */
 const OUT=[[0.2260,0.3470,0.0000,0.2216,0.0000,0.0000],[0.2133,0.2394,0.0000,0.5198,0.3297,0.0000]];
