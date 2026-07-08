@@ -174,6 +174,10 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;bac
 .decoded{font-family:var(--mono);font-size:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;min-height:44px}
 .decoded .nw{color:var(--accent);font-weight:700}
 .note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--accent-ghost);border-radius:0 8px 8px 0;padding:12px 15px;margin:16px 0;max-width:var(--read);font-size:14px;color:var(--muted)}.note b{color:var(--accent)}
+/* 訓練/推論 模式徽章 */
+.mode{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;vertical-align:3px;margin-left:10px;white-space:nowrap}
+.mode.train{background:color-mix(in srgb,var(--cool) 16%,transparent);color:var(--cool);border:1px solid var(--cool)}
+.mode.infer{background:var(--accent-ghost);color:var(--accent);border:1px solid var(--accent)}
 /* io 卡：每節的 layer 示意圖（input → layer → output）*/
 .iocard{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin:12px 0 6px;overflow-x:auto;padding-bottom:2px}
 .iocard .io{display:flex;flex-direction:column;justify-content:center;text-align:center;padding:8px 12px;border-radius:8px;line-height:1.5;flex:none}
@@ -261,6 +265,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1p
       <p>attention 只是引擎，要組成一台能吐字的 GPT 還需要一批「看似配角、缺一不可」的零件。這是本章的積木清單——<strong>它會隨你往下讀自動打勾</strong>（也可以點擊跳到該節）：</p>
       <div class="bricks" id="bricks"></div>
       <div class="plain"><div class="ph">🔰 先建立心態</div><p>GPT 的架構沒有想像中複雜。它的「深」不是來自千奇百怪的結構，而是<strong>同一個 transformer block 重複 12 次</strong>。理解一個 block，就理解了整台模型的主體。另外：本章做完的模型<strong>還不會講人話</strong>——權重是隨機的，訓練（pretraining）是第 5 章的事，所以結尾生成出亂碼是預期結果。</p></div>
+
+      <div class="plain"><div class="ph">🔰 先分清楚兩種模式：訓練 vs 推論（本頁會隨時標註）</div><p>模型有兩種「使用模式」，千萬別混在一起：<span class="mode train">🏋️ 訓練 training</span>＝forward 算預測 → 算 loss → backward 算梯度 → <b>更新權重</b>，靠大量資料把權重調好（第 5 章的主題）；<span class="mode infer">💬 推論 inference</span>＝<b>權重固定不動</b>、只做 forward，一次吐一個字。本章主要在搭<b>兩種模式共用的架構</b>；但凡講到「梯度」（LayerNorm 的動機、shortcut、前向×反向）都是在講<b>訓練</b>，而 4.7 的文字生成是<b>推論</b>。各節標題旁會掛上對應的標籤。</p></div>
 
       <h3>暖身：tensor 就是「多層的 array」</h3>
       <p>模型看不懂文字，只吃數字。一個字（token）→ 一串數字（<span class="en">vector</span>）；一句話 → 一疊向量（<span class="en">matrix</span>）；一批句子 → 再疊一層（3 維 <span class="en">tensor</span>）。以單字 <b>moves</b> 為例：</p>
@@ -352,7 +358,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1p
         <div class="stepcap" id="shapeCap">👆 點一個維度</div>
       </div>
       <div class="note"><b>關鍵：</b>輸入幾個 token，輸出就有幾個對應向量——模型對<strong>每一個位置</strong>都給出「下一個 token 是誰」的 50257 個分數（logits，尚未過 softmax）。生成時我們只取最後一個位置的那條。</div>
-      <div class="note"><b>常見疑問：那前面位置的 logits 要拿去 argmax 嗎？</b>不用——前面位置的字<strong>已經固定</strong>（它們就是輸入本身），生成時只對最後一格做 argmax，早期位置的 logits 直接丟棄。那幹嘛算它們？<b>①</b> transformer 是一次矩陣運算算完所有位置，各位置 logits 是同一次計算順便掉出來的；<b>②</b> 真正的主場在<strong>訓練</strong>：每個位置都是一筆「預測下一個字」的訓練樣本——4 個 token 一次 forward 就得到 4 筆監督訊號（第 5 章的 loss 正是對所有位置一起算），這是 GPT 訓練效率高的關鍵。</div>
+      <div class="note"><b>常見疑問：那前面位置的 logits 要拿去 argmax 嗎？</b><span class="mode infer">💬 推論</span>時不用——前面位置的字<strong>已經固定</strong>（它們就是輸入本身），只對最後一格做 argmax，早期位置的 logits 直接丟棄。那幹嘛算它們？<b>①</b> transformer 是一次矩陣運算算完所有位置，各位置 logits 是同一次計算順便掉出來的；<b>②</b> 真正的主場在<span class="mode train">🏋️ 訓練</span>：每個位置都是一筆「預測下一個字」的訓練樣本——4 個 token 一次 forward 就得到 4 筆監督訊號（第 5 章的 loss 正是對所有位置一起算），這是 GPT 訓練效率高的關鍵。</div>
     </section>
 
     <!-- ===== 4.2 ===== -->
@@ -375,7 +381,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1p
         <div class="stepcap" id="glCap"></div>
       </div>
 
-      <h3>互動②：那 loss 會怎樣？（瀏覽器裡真的訓練 300 步）</h3>
+      <h3>互動②：那 loss 會怎樣？（瀏覽器裡真的訓練 300 步）<span class="mode train">🏋️ 訓練</span></h3>
       <p>同一個 6 層小網路，只差在<strong>初始權重的倍率 s</strong>（就是互動①那顆旋鈕，訓練開始時權重的整體大小）：s=0.3（太小）、s=3.0（太大）、s=3.0 但每層加 LayerNorm。在你的瀏覽器裡<strong>實際跑 300 步訓練</strong>（真實 forward + backward + 權重更新），把 loss 畫出來：</p>
       <div class="stage">
         <div style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px"><canvas id="tlCv" width="820" height="300"></canvas></div>
@@ -461,7 +467,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1p
 
     <!-- ===== 補充：前向×反向 ===== -->
     <section id="sec-fb" data-map="s-block">
-      <div class="sh"><span class="num">🔁</span><h2>補充：前向傳播 × 反向傳播</h2></div>
+      <div class="sh"><span class="num">🔁</span><h2>補充：前向傳播 × 反向傳播<span class="mode train">🏋️ 訓練</span></h2></div>
       <div class="iocard"><span class="io in">input：x<br>[2]</span><span class="ioarrow">→</span><span class="io box">小型網路<small>Linear+tanh（3 節點）→ Linear</small></span><span class="ioarrow">→</span><span class="io out">output：ŷ 與 loss<br>（backward 再沿原路回傳梯度）</span></div>
       <p class="cap" style="color:var(--muted)">下一節會用「各層梯度」證明 shortcut 的威力——先花兩分鐘搞懂梯度從哪來。<span class="en">forward pass</span> 把輸入算成預測、算出 loss；<span class="en">backward pass</span>（backpropagation）用連鎖律從 loss 往回，算出每個權重「該往哪調」。</p>
       <div class="stage">
@@ -484,7 +490,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1p
 
     <!-- ===== 4.4 ===== -->
     <section id="sec-44" data-map="s-block" data-sub="2,5">
-      <div class="sh"><span class="num">4.4</span><h2>Adding shortcut connections（加入捷徑連接）</h2></div>
+      <div class="sh"><span class="num">4.4</span><h2>Adding shortcut connections（加入捷徑連接）<span class="mode train">🏋️ 為了訓練</span></h2></div>
       <div class="iocard"><span class="io in">input：x</span><span class="ioarrow">→</span><span class="io box">任意子層<small>Linear+GELU / attention / FFN …</small></span><span class="ioarrow">→</span><span class="plus">＋</span><span class="ioarrow" style="font-size:10px">x 走捷徑<br>直接加回</span><span class="ioarrow">→</span><span class="io out">output = 子層(x) + x<br>（形狀相同才能相加）</span></div>
       <p><span class="en">Shortcut connection</span>（又稱 skip / residual connection，源自電腦視覺的 ResNet）作法樸素到不可思議：<strong>把某一層的輸入，直接加到那一層的輸出上</strong>。這等於替反向傳播的梯度開一條「抄近路」的旁路，繞過中間運算、避免梯度層層縮小。</p>
       <p>書中用一個 5 層小網路（每層 Linear+GELU）實測。<code class="inl">forward</code> 裡可選擇要不要加捷徑：</p>
@@ -612,7 +618,7 @@ Output head（不綁時）= V × E                        = 50257×768          
 
     <!-- ===== 4.7 ===== -->
     <section id="sec-47" data-map="s-head,s-gen">
-      <div class="sh"><span class="num">4.7</span><h2>Generating text（生成文字）</h2></div>
+      <div class="sh"><span class="num">4.7</span><h2>Generating text（生成文字）<span class="mode infer">💬 推論</span></h2></div>
       <div class="iocard"><span class="io in">input：idx<br>[1, n]</span><span class="ioarrow">→</span><span class="io box">model → 取 [:, -1, :] → softmax → argmax<small>只看最後一個位置的預測</small></span><span class="ioarrow">→</span><span class="io out">output：idx<br>[1, n+1]（接回再跑，迴圈）</span></div>
       <p>生成式模型<strong>一次產生一個 token</strong>、接龍式寫句子。單步機制：模型輸出 logits → <strong>只取最後一個位置</strong>那條 50257 維向量 → softmax 轉機率 → argmax 挑最大 → 把新 token ID 接回輸入 → 再跑一輪。</p>
       <pre>def generate_text_simple(model, idx, max_new_tokens, context_size):
