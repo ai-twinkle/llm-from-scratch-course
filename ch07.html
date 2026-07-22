@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ch7 指令跟隨微調｜互動教材</title>
+<style>
+:root{
+  --accent:#6d5ae6;--accent-soft:#8b7bf0;--accent-ghost:rgba(109,90,230,.12);
+  --bg:#e7e6ec;--grid:rgba(22,18,32,.05);--surface:#f6f5fa;--surface-2:#eae8f1;
+  --ink:#171325;--muted:#5b5570;--faint:#8b849e;
+  --line:rgba(22,18,32,.14);--line-strong:rgba(22,18,32,.28);
+  --ok:#3f8a52;--bad:#c0492f;--cool:#2f6fb0;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"PingFang TC","Noto Sans TC","Segoe UI",sans-serif;
+  --maxw:1220px;--read:68ch;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0b0912;--grid:rgba(139,123,240,.06);--surface:#141020;--surface-2:#1c1730;
+  --ink:#e6e2f2;--muted:#9a92b3;--faint:#6b6486;--line:rgba(228,222,245,.13);--line-strong:rgba(228,222,245,.26);
+  --accent:#8b7bf0;--accent-soft:#a99cf5;--accent-ghost:rgba(139,123,240,.16);--ok:#5faf70;--bad:#e2694f;--cool:#6f9ede;}}
+:root[data-theme="light"]{--bg:#e7e6ec;--grid:rgba(22,18,32,.05);--surface:#f6f5fa;--surface-2:#eae8f1;--ink:#171325;--muted:#5b5570;--faint:#8b849e;--line:rgba(22,18,32,.14);--line-strong:rgba(22,18,32,.28);--accent:#6d5ae6;--accent-soft:#8b7bf0;--accent-ghost:rgba(109,90,230,.12);--ok:#3f8a52;--bad:#c0492f;--cool:#2f6fb0;}
+:root[data-theme="dark"]{--bg:#0b0912;--grid:rgba(139,123,240,.06);--surface:#141020;--surface-2:#1c1730;--ink:#e6e2f2;--muted:#9a92b3;--faint:#6b6486;--line:rgba(228,222,245,.13);--line-strong:rgba(228,222,245,.26);--accent:#8b7bf0;--accent-soft:#a99cf5;--accent-ghost:rgba(139,123,240,.16);--ok:#5faf70;--bad:#e2694f;--cool:#6f9ede;}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.68;-webkit-font-smoothing:antialiased;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:30px 30px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+a{color:var(--accent)}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:70;transition:width .1s}
+header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 88%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:52px}
+.brand{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px}.brand b{color:var(--ink)}
+.chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--accent);color:var(--accent);border-radius:2px}
+.spacer{flex:1}.tbtn{font-family:var(--mono);font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:3px;padding:5px 10px;cursor:pointer}.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+/* 全域指令微調管線圖 */
+.map{position:sticky;top:52px;z-index:49;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:8px 0 6px}
+.map .wrap{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:none}
+.map .wrap::-webkit-scrollbar{display:none}
+.mapstage{flex:none;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);cursor:pointer;transition:.25s;white-space:nowrap}
+.mapstage .em{font-size:12px}
+.mapstage:hover{border-color:var(--accent-soft)}
+.mapstage.lit{background:var(--accent);color:#16103a;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ghost)}
+.mapsep{flex:none;color:var(--faint);padding:0 2px;font-size:11px}
+.mapsub{font-family:var(--mono);font-size:11px;color:var(--accent);padding:3px 0 0;min-height:16px}
+.mapsub b{color:var(--ink)}
+@media(max-width:700px){.mapstage{font-size:10px;padding:4px 7px}}
+/* layout */
+.shell{display:grid;grid-template-columns:186px minmax(0,1fr);gap:40px;padding-top:28px}
+@media(max-width:960px){.shell{grid-template-columns:1fr;gap:0}}
+nav.toc{position:sticky;top:118px;align-self:start;font-family:var(--mono);font-size:12px;max-height:calc(100vh - 140px);overflow:auto}
+@media(max-width:960px){nav.toc{display:none}}
+nav.toc .lbl{color:var(--faint);letter-spacing:.14em;font-size:10px;text-transform:uppercase;margin-bottom:10px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--ink);border-color:var(--line-strong)}nav.toc a.active{color:var(--accent);border-color:var(--accent)}
+main{min-width:0}
+.hero{padding:6px 0 26px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(26px,4.6vw,42px);line-height:1.06;margin:0;letter-spacing:-.01em}
+h1 .sub{display:block;font-size:clamp(14px,2.2vw,18px);color:var(--muted);font-weight:500;margin-top:10px}
+.lede{font-size:16px;color:var(--muted);max-width:var(--read);margin:16px 0 0}
+section{padding:38px 0;border-bottom:1px solid var(--line);scroll-margin-top:132px}
+.sh{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;flex-wrap:wrap}
+.sh .num{font-family:var(--mono);color:var(--accent);font-size:13px;font-weight:600}
+h2{font-family:var(--mono);font-weight:600;font-size:clamp(18px,2.8vw,24px);margin:0;letter-spacing:-.01em}
+h3{font-family:var(--mono);font-size:15px;margin:28px 0 8px;font-weight:600;color:var(--ink)}
+p{max-width:var(--read);margin:12px 0;color:var(--muted)}p strong,li strong{color:var(--ink)}
+.en{font-family:var(--mono);font-size:.92em;color:var(--accent);font-weight:600}
+ul.clean{max-width:var(--read);padding-left:0;list-style:none;margin:14px 0}ul.clean li{position:relative;padding-left:20px;margin:8px 0;color:var(--muted)}
+ul.clean li::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+.plain{max-width:var(--read);background:var(--accent-ghost);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 16px;margin:16px 0;font-size:14.5px;color:var(--ink)}
+.plain .ph{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent);font-weight:700;margin-bottom:5px}
+.plain p{margin:6px 0 0;color:var(--ink);max-width:none}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.small{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+canvas{display:block;width:100%;height:auto}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:14px 0}
+pre .c{color:var(--faint)}pre .k{color:var(--accent)}
+code.inl{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:var(--ink)}
+.btn{font-family:var(--mono);font-size:12.5px;padding:8px 15px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#16103a;cursor:pointer;font-weight:600}
+.btn.ghost{background:none;color:var(--accent)}.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font-family:var(--mono);font-size:12px;padding:7px 12px;background:var(--surface-2);border:none;border-right:1px solid var(--line);cursor:pointer;color:var(--muted)}
+.seg button:last-child{border-right:none}.seg button.on{background:var(--accent);color:#16103a}
+.pill{font-family:var(--mono);font-size:12px;padding:6px 11px;border:1px solid var(--line);background:var(--surface-2);border-radius:20px;cursor:pointer;color:var(--muted)}
+.pill:hover{border-color:var(--accent);color:var(--accent)}.pill.on{background:var(--accent);color:#16103a;border-color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+input[type=range]{-webkit-appearance:none;height:4px;border-radius:3px;background:var(--surface-2);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+/* tensor（array）呈現 */
+.tsr{font-family:var(--mono);font-size:12.5px;line-height:1.9;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.tsr .pn{color:var(--faint)}
+.tsr .lbl{color:var(--faint);font-size:11px}
+.tn{display:inline-block;padding:0 5px;border-radius:5px;transition:.12s;cursor:default}
+.tn:hover,.tn.hot{background:var(--accent);color:#16103a!important}
+.tn.dimmed{opacity:.35}
+.tn.neg{color:var(--cool)}
+.tsrnote{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-height:18px;margin-top:8px}
+.tsrnote b{color:var(--ink)}
+/* 積木進度（本章 9 個步驟） */
+.bricks{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin:14px 0}
+.brick{font-family:var(--mono);font-size:11.5px;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--muted);cursor:pointer;transition:.25s;display:flex;gap:8px;align-items:flex-start}
+.brick .ck{width:16px;height:16px;flex:none;border:1.5px solid var(--line-strong);border-radius:4px;display:grid;place-items:center;font-size:10px;color:#fff;margin-top:1px}
+.brick.done{border-color:var(--ok);color:var(--ink)}.brick.done .ck{background:var(--ok);border-color:var(--ok)}
+.brick.now{border-color:var(--accent);background:var(--accent-ghost);color:var(--ink);box-shadow:0 0 0 3px var(--accent-ghost)}
+.brick.now .ck{border-color:var(--accent);color:var(--accent)}
+/* 句子 chips */
+.sent{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+.wchip{font-family:var(--mono);font-size:13.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);cursor:default;transition:.12s}
+.wchip.hot{background:var(--accent);color:#16103a;border-color:var(--accent)}
+.wchip small{display:block;font-size:9.5px;color:var(--faint);text-align:center}
+.wchip.hot small{color:#16103a}
+/* stepper 共用 */
+.stepbar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.dots{display:flex;gap:6px;align-items:center;margin-left:auto}
+.dot2{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}.dot2.on{background:var(--accent)}
+.stepcap{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--accent-ghost);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;padding:11px 14px;margin-top:12px;min-height:42px}
+.stepcap b{color:var(--accent)}
+/* code-line stepper */
+.codelines{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 0;overflow-x:auto}
+.cl{padding:3px 16px;white-space:pre;color:var(--muted);border-left:3px solid transparent;transition:.2s}
+.cl.lit{background:var(--accent-ghost);border-left-color:var(--accent);color:var(--ink)}
+.cl .cm{color:var(--faint)}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--accent-ghost);border-radius:0 8px 8px 0;padding:12px 15px;margin:16px 0;max-width:var(--read);font-size:14px;color:var(--muted)}.note b{color:var(--accent)}
+/* 表格 */
+.cmtable{border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.cmtable th,.cmtable td{border:1px solid var(--line);padding:7px 10px;text-align:center}
+.cmtable th{color:var(--muted);font-weight:600;background:var(--surface-2);font-size:11px}
+.cmtable td.tgt{outline:2px solid var(--accent);outline-offset:-2px;font-weight:700;color:var(--accent)}
+.cmtable td.amx{background:var(--accent-ghost)}
+.cmtable td.dim{color:var(--faint)}
+/* 訓練/推論 模式徽章 */
+.mode{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;vertical-align:3px;margin-left:10px;white-space:nowrap}
+.mode.train{background:color-mix(in srgb,var(--cool) 16%,transparent);color:var(--cool);border:1px solid var(--cool)}
+.mode.infer{background:var(--accent-ghost);color:var(--accent);border:1px solid var(--accent)}
+/* io 卡 */
+.iocard{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin:12px 0 6px;overflow-x:auto;padding-bottom:2px}
+.iocard .io{display:flex;flex-direction:column;justify-content:center;text-align:center;padding:8px 12px;border-radius:8px;line-height:1.5;flex:none}
+.iocard .in,.iocard .out{border:1.5px dashed var(--line-strong);color:var(--muted);background:var(--surface)}
+.iocard .out{border-color:var(--accent-soft)}
+.iocard .box{border:1.5px solid var(--accent);background:var(--accent-ghost);color:var(--ink);font-weight:600}
+.iocard .box small{display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px}
+.iocard .ioarrow{align-self:center;color:var(--faint);flex:none}
+/* 解碼輸出框 */
+.decoded{font-family:var(--mono);font-size:13.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;min-height:44px}
+.decoded .nw{color:var(--accent);font-weight:700}
+.decoded .bad2{color:var(--bad);font-weight:700}
+/* token 色塊列（collate stepper） */
+.seqlab{font-family:var(--mono);font-size:11px;color:var(--faint);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.06em}
+.tokrow{display:flex;gap:5px;font-family:var(--mono);font-size:12px;margin:4px 0;align-items:center}
+.tokrow .rl{width:64px;flex:none;color:var(--muted);font-size:11px}
+.cell{min-width:50px;text-align:center;padding:6px 5px;border-radius:6px;border:1px solid var(--line);background:var(--accent-ghost);color:var(--ink);flex:none;transition:.25s}
+.cell.eot{background:var(--accent);color:#16103a;border-color:var(--accent);font-weight:700}
+.cell.pad{background:var(--surface-2);color:var(--faint);border-style:dashed}
+.cell.ign{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad);border-color:var(--bad);font-weight:700}
+/* 資料切分色塊 */
+.winrow{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0;align-items:center}
+.win{width:24px;height:16px;border-radius:4px;background:var(--accent);opacity:.85;flex:none}
+.win.val{background:var(--cool)}
+.win.test{background:var(--faint)}
+.win.drop{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,var(--line) 4px,var(--line) 6px);border:1px dashed var(--line-strong);opacity:.9}
+.winleg{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px}
+.winleg i{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:5px}
+/* 分數標尺 */
+.pxtrack{position:relative;height:52px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;margin:10px 0}
+.pxmark{position:absolute;top:0;bottom:0;width:2px;background:var(--line-strong)}
+.pxmark span{position:absolute;top:-2px;left:5px;font-family:var(--mono);font-size:9.5px;color:var(--faint);white-space:nowrap}
+.pxdot{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);transition:left .15s}
+/* quiz */
+.quiz .q{margin:18px 0}.quiz .qn{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:7px}.quiz .qt{font-weight:600;color:var(--ink);max-width:var(--read);margin-bottom:9px}
+.opt{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 14px;margin:6px 0;cursor:pointer;font-family:var(--sans);font-size:14px;color:var(--ink);max-width:var(--read)}
+.opt:hover{border-color:var(--accent)}.opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.opt .mk{float:right;font-family:var(--mono);font-weight:700}.opt.correct .mk{color:var(--ok)}.opt.wrong .mk{color:var(--bad)}
+.exp{max-width:var(--read);font-size:13px;color:var(--muted);padding:9px 14px;border-left:2px solid var(--accent);margin:5px 0 0;display:none}.exp.show{display:block}
+.foot{font-family:var(--mono);font-size:11px;color:var(--faint);padding:28px 0 70px;text-align:center;line-height:1.9}
+kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<header class="top"><div class="wrap">
+  <div class="brand"><span class="chip">CH·7</span><b><a href="index.html" style="color:inherit;text-decoration:none">從零打造 LLM</a></b><span style="color:var(--faint)">/ 指令跟隨微調</span></div>
+  <div class="spacer"></div><button class="tbtn" id="themeBtn">◐ 主題</button>
+</div></header>
+
+<div class="map">
+  <div class="wrap" id="mapRow"></div>
+  <div class="wrap"><div class="mapsub" id="mapSub"></div></div>
+</div>
+
+<div class="wrap"><div class="shell">
+  <nav class="toc" aria-label="章節導覽">
+    <div class="lbl">Chapter 7</div>
+    <a href="#sec-intro">本章定位 · 9 個步驟</a>
+    <a href="#sec-71">7.1 指令微調是什麼</a>
+    <a href="#sec-72">7.2 資料集與 Alpaca 格式</a>
+    <a href="#sec-73">7.3 batch＋(−100) mask</a>
+    <a href="#sec-74">7.4 data loaders</a>
+    <a href="#sec-75">7.5 載入 355M</a>
+    <a href="#sec-76">7.6 微調</a>
+    <a href="#sec-77">7.7 抽取回應</a>
+    <a href="#sec-78">7.8 LLM 評分</a>
+    <a href="#sec-79">7.9 結語</a>
+    <a href="#sec-sum">本章小結</a>
+    <a href="#sec-quiz">✓ 知識檢核</a>
+  </nav>
+
+  <main>
+    <div class="hero" id="top">
+      <p class="eyebrow">Build a Large Language Model (From Scratch) · Chapter 7</p>
+      <h1>指令跟隨微調<span class="sub">Fine-tuning to follow instructions</span></h1>
+      <p class="lede">第 6 章教會模型「分類」，但分類器只會回答是或否。全書最後一章要補上關鍵的一步：用 1,100 筆「指令 → 理想回應」的資料微調 GPT-2，讓它<strong>聽得懂人話、照指令回答</strong>——這正是 ChatGPT 這類助理誕生的那一步。過程會實作本章最棘手的 <span class="en">custom collate</span>（padding＋<span class="en">−100</span> 遮罩）、換上更大的 <span class="en">355M</span> 模型、微調 2 個 epoch，最後請另一個 LLM（<span class="en">Llama 3</span>）當裁判打分數。頁面中的關鍵數值都與書中執行輸出一致（示意值會另行標明）。</p>
+    </div>
+
+    <!-- ===== 本章定位 ===== -->
+    <section id="sec-intro" data-map="all">
+      <div class="sh"><span class="num">00</span><h2>本章定位：全書最後一塊拼圖</h2></div>
+      <p>整本書的三階段地圖，本章走到終點——<strong>第三階段的第 9 步</strong>：把預訓練好的 foundation model 微調成個人助理（personal assistant）：</p>
+      <div class="iocard">
+        <span class="io in">STAGE 1（ch2–4）<br>資料 · attention · 架構 ✓</span><span class="ioarrow">→</span>
+        <span class="io in">STAGE 2（ch5）<br>預訓練＋載入權重 ✓</span><span class="ioarrow">→</span>
+        <span class="io box">STAGE 3（ch6 分類 ✓ · 本章）<br>指令微調 instruction fine-tuning<small>資料準備 · 355M · 微調 · LLM 評分</small></span><span class="ioarrow">→</span>
+        <span class="io out">output：一個會聽指令的 GPT<br>（全書旅程完成 🎉）</span>
+      </div>
+      <p>本章依書中圖 7.3 分成三個階段、<strong>9 個步驟</strong>——會隨你往下讀自動打勾（也可以點擊跳到該節）：</p>
+      <div class="bricks" id="bricks"></div>
+      <div class="plain"><div class="ph">🔰 先建立心態</div><p>指令微調一句話就講完：<strong>同一套訓練迴圈，換一批資料</strong>。第 5 章的 <code class="inl">cross_entropy</code>、AdamW、<code class="inl">train_model_simple()</code> 原封不動搬過來，只是餵進去的不再是小說原文，而是「指令 → 好回應」的配對。模型的「接下一個字」本能，就這樣被導向「回應指令」。本章九成的功夫其實花在<b>資料怎麼整理</b>——這也是實務上指令微調的真實比例。</p></div>
+      <h3>暖身：本章的四個關鍵數字</h3>
+      <div class="stage"><div class="tsr"><span class="lbl"># 先預告，全部都會親手做出來（書中真實輸出）</span>
+資料集    <span class="tn" style="color:var(--accent);font-weight:700">1,100</span> 筆 instruction–response pairs（train 935 / val 55 / test 110）
+模型      GPT-2 <span class="tn" style="color:var(--accent);font-weight:700">medium 355M</span>（124M 容量不夠，第一次換大模型）
+訓練      <span class="tn" style="color:var(--accent);font-weight:700">2</span> epochs · AdamW(lr=5e-5) · A100 只要 0.86 分鐘
+成績      Llama 3 評分平均 <span class="tn" style="color:var(--accent);font-weight:700">50.32</span> / 100（對照：Llama 3 8B base 58.51）</div></div>
+    </section>
+
+    <!-- ===== 7.1 ===== -->
+    <section id="sec-71" data-map="s-data">
+      <div class="sh"><span class="num">7.1</span><h2>Introduction to instruction fine-tuning（指令微調是什麼）</h2></div>
+      <div class="iocard"><span class="io in">input：預訓練 LLM<br>很會「接話」的 text completion 機器</span><span class="ioarrow">→</span><span class="io box">supervised instruction fine-tuning<small>用「指令→理想回應」配對繼續訓練</small></span><span class="ioarrow">→</span><span class="io out">output：會「照指令回答」的 LLM<br>chatbot／助理的基礎</span></div>
+      <p>第 5 章預訓練出來的模型是一台 <span class="en">text completion</span> 機器：給它半句話，它能接得頭頭是道。但丟給它一個具體指令——「把這段文字的文法改對」「把這句話改成被動語態」——它常常<strong>接著出題而不是回答</strong>（7.5 節會看到活生生的例子）。<span class="en">instruction fine-tuning</span>（又稱 <span class="en">supervised instruction fine-tuning</span>）就是解法：用大量「指令 → 理想回應」配對繼續訓練。<strong>點下面三個書中真實例子</strong>（圖 7.2），感受一下目標行為：</p>
+      <div class="stage">
+        <div class="controls" id="p71Pills">
+          <button class="pill on" data-i="0">單位換算</button>
+          <button class="pill" data-i="1">同義詞</button>
+          <button class="pill" data-i="2">改寫句子（去被動）</button>
+        </div>
+        <div class="decoded" id="p71Tsr"></div>
+        <div class="stepcap" id="p71Cap"></div>
+      </div>
+      <div class="note"><b>和第 6 章的分類微調差在哪？</b>分類微調的輸出是「N 選 1 的類別」（spam／not spam）；指令微調的輸出是<b>自由文字</b>——答案不唯一、對錯有程度。這讓它更通用（一個模型應付千百種任務），但也讓 7.8 節的「評估」變得比算 accuracy 難得多。</div>
+    </section>
+
+    <!-- ===== 7.2 ===== -->
+    <section id="sec-72" data-map="s-data,s-fmt">
+      <div class="sh"><span class="num">7.2</span><h2>Preparing a dataset for supervised instruction fine-tuning（準備資料集）</h2></div>
+      <div class="iocard"><span class="io in">input：instruction-data.json<br>1,100 筆 · 204 KB</span><span class="ioarrow">→</span><span class="io box">format_input（Alpaca 模板）＋ 85/5/10 切分<small>下載 → 檢視 → 格式化 → train/val/test</small></span><span class="ioarrow">→</span><span class="io out">output：三份格式化資料<br>935 / 55 / 110 筆</span></div>
+      <p>資料集是作者專為本書製作的 <b>1,100</b> 筆 <span class="en">instruction–response pairs</span>（一個 204 KB 的 JSON 檔，<code class="inl">download_and_load_file()</code> 抓下來後 <code class="inl">len(data)</code> = 1100）。每筆是一個三欄位字典。<strong>點三筆真實 entry 看結構：</strong></p>
+      <div class="stage">
+        <div class="controls" id="dsPills">
+          <button class="pill on" data-i="0">data[50]</button>
+          <button class="pill" data-i="1">data[999]</button>
+          <button class="pill" data-i="2">test_data[0]</button>
+        </div>
+        <div class="tsr" id="dsTsr"></div>
+        <div class="stepcap" id="dsCap"></div>
+      </div>
+
+      <h3>Alpaca prompt 格式：把三個欄位組成一段文字</h3>
+      <p>光有欄位還不夠——訓練時要把它們組成一段模型看得懂的<strong>提示文字</strong>。本書採用 <span class="en">Alpaca</span> 風格（最早公開指令微調流程的模型之一，格式因此成為經典）。<strong>按「下一步」看 <code class="inl">format_input()</code> 逐段組裝</strong>，並切換兩筆 entry 比較「有／無 input」的差別：</p>
+      <div class="stage">
+        <div class="controls" id="alPills">
+          <button class="pill on" data-i="0">data[50]（有 input）</button>
+          <button class="pill" data-i="1">data[999]（input 空）</button>
+        </div>
+        <div class="tsr" id="alTsr" style="white-space:pre-wrap"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="alPrev">← 上一步</button>
+          <button class="btn" id="alNext">下一步 →</button>
+          <span class="dots" id="alDots"></span>
+        </div>
+        <div class="stepcap" id="alCap"></div>
+      </div>
+      <div class="note"><b>另一種流派：Phi-3 prompt style。</b>同一筆 data[50] 也可以包成特殊 token 的形式（微軟 Phi-3 的做法，書中圖 7.4）：<br><code class="inl">&lt;|user|&gt;</code> Identify the correct spelling of the following word: 'Ocassion' <code class="inl">&lt;|assistant|&gt;</code> The correct spelling is 'Occasion'.<br>本書全程用 Alpaca 風格；書中練習 7.1 邀你微調完改用 Phi-3 格式，比較回應品質有無差別。</div>
+
+      <h3>切成三份：85% / 5% / 10%</h3>
+      <pre><span class="c"># Listing 7.3 — 真實輸出：Training set length: 935 / Validation set length: 55 / Test set length: 110</span>
+train_portion = int(len(data) * <span class="k">0.85</span>)             <span class="c"># 935 筆拿去訓練</span>
+test_portion  = int(len(data) * <span class="k">0.1</span>)              <span class="c"># 110 筆留給最終評估</span>
+val_portion   = len(data) - train_portion - test_portion   <span class="c"># 剩下 55 筆當驗證</span></pre>
+      <div class="stage">
+        <div class="winrow" id="spWins"></div>
+        <div class="winleg"><span><i style="background:var(--accent)"></i>train 935（85%）</span><span><i style="background:var(--cool)"></i>validation 55（5%）</span><span><i style="background:var(--faint)"></i>test 110（10%）</span><span class="small">（每個色塊 = 55 筆）</span></div>
+        <div class="stepcap">和第 6 章的 spam 資料一樣切三份：<b>train</b> 調權重、<b>val</b> 在訓練中監控、<b>test</b> 只在最後評估用（7.7–7.8 的 110 筆考題就是它）。val 只有 55 筆偏少——教學示範可接受，書中也提醒實務上資料愈大愈好（練習 7.3：52,002 筆的原版 Alpaca 資料集）。</div>
+      </div>
+    </section>
+
+    <!-- ===== 7.3 ===== -->
+    <section id="sec-73" data-map="s-fmt,s-batch">
+      <div class="sh"><span class="num">7.3</span><h2>Organizing data into training batches（組 batch：padding 與 −100）</h2></div>
+      <div class="iocard"><span class="io in">input：長度不一的 token 序列<br>（InstructionDataset 已模板化＋tokenize）</span><span class="ioarrow">→</span><span class="io box">custom_collate_fn<small>pad 到批內最長 · +50256 · 右移 · −100 遮罩</small></span><span class="ioarrow">→</span><span class="io out">output：inputs / targets 兩個 tensor<br>可直接餵給訓練迴圈</span></div>
+      <p>第 6 章的 batch 是 DataLoader 用<strong>預設 collate</strong> 自動組的；這一章句子長度差異太大，得自己寫一個 <span class="en">custom collate function</span>。它是全章技術含量最高的一段，做四件事，缺一不可。先由 <code class="inl">InstructionDataset</code> 把每筆資料「套模板＋<span class="en">pretokenize</span>」（7.2 的成果），接著<strong>用書中的迷你例子逐步走一遍 collate</strong>（序列 [0,1,2,3,4]、[5,6]、[7,8,9]，輸出與書中 tensor 完全一致）：</p>
+      <div class="stage">
+        <div id="clViz" style="overflow-x:auto"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="clPrev">← 上一步</button>
+          <button class="btn" id="clNext">下一步 →</button>
+          <span class="dots" id="clDots"></span>
+        </div>
+        <div class="stepcap" id="clCap"></div>
+      </div>
+      <pre><span class="c"># Listing 7.5 的核心（custom_collate_fn）：</span>
+batch_max_length = max(len(item)+<span class="k">1</span> for item in batch)  <span class="c"># +1：等下每條先加一個 50256</span>
+new_item += [pad_token_id]                             <span class="c"># ① 每條先補一個 &lt;|endoftext|&gt;（ID 50256）</span>
+padded = new_item + [pad_token_id] * (batch_max_length - len(new_item))  <span class="c"># ② pad 到批內最長</span>
+inputs  = torch.tensor(padded[:-1])                    <span class="c"># ③ 截掉最後一個 → inputs</span>
+targets = torch.tensor(padded[1:])                     <span class="c">#    右移一格     → targets</span>
+mask = targets == pad_token_id                         <span class="c"># ④ 找出 targets 裡所有 50256</span>
+indices = torch.nonzero(mask).squeeze()
+if indices.numel() &gt; 1:
+    targets[indices[<span class="k">1:</span>]] = ignore_index               <span class="c">#    第一個以外全換 -100</span>
+if allowed_max_length is not None:                     <span class="c"># 可選：截斷到 1024（GPT-2 上限）</span>
+    inputs, targets = inputs[:allowed_max_length], targets[:allowed_max_length]</pre>
+
+      <h3>−100 憑什麼讓 loss 視而不見？</h3>
+      <p>因為 <b>−100 是 PyTorch <code class="inl">cross_entropy</code> 的預設 <span class="en">ignore_index</span></b>——函數簽名寫著 <code class="inl">cross_entropy(..., ignore_index=-100)</code>。書中用一個三行 logits 的小例子證明它「真的完全不算」。<strong>切換三種 targets</strong>，觀察 loss 的計算範圍（loss 為書中真實輸出，各位置的 −log p 為即時推導）：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="igSeg"><button data-i="0" class="on">targets_1 = [0, 1]</button><button data-i="1">targets_2 = [0, 1, 1]</button><button data-i="2">targets_3 = [0, 1, -100]</button></span></div>
+        <div class="tsr" id="igTsr"></div>
+        <div class="stepcap" id="igCap"></div>
+      </div>
+      <div class="note"><b>為什麼保留第一個 50256？</b>它不是 padding，是<b>「我講完了」的訊號</b>——模型要學會在回應結尾生成 <span class="en">&lt;|endoftext|&gt;</span>，之後 7.5／7.7 的 <code class="inl">generate(..., eos_id=50256)</code> 才知道何時停筆。其餘的 50256 是純粹為了對齊長度的填充，學它毫無意義，所以交給 −100。這正是 5.1.2 那套 cross entropy 六步驟——只是多認識了一個參數。</div>
+      <div class="note"><b>要不要連 instruction 一起遮？</b>書中圖 7.13 示範另一種做法：把 targets 裡「instruction＋input」段也全換 −100，讓 loss 只算 Response 段——模型專心學「怎麼回答」、不去背題目。但研究上仍有分歧：Shi et al.（2024）《Instruction Tuning With Loss Over Instructions》發現<b>不遮往往表現更好</b>。本書選擇只遮 padding、不遮 instruction，把後者留作練習 7.2。</div>
+    </section>
+
+    <!-- ===== 7.4 ===== -->
+    <section id="sec-74" data-map="s-batch">
+      <div class="sh"><span class="num">7.4</span><h2>Creating data loaders for an instruction dataset（建立 data loader）</h2></div>
+      <div class="iocard"><span class="io in">input：InstructionDataset ×3<br>＋ custom_collate_fn</span><span class="ioarrow">→</span><span class="io box">DataLoader<small>batch_size=8 · train shuffle+drop_last · partial() 綁 device</small></span><span class="ioarrow">→</span><span class="io out">output：train / val / test loader<br>每個 batch 形狀各不相同</span></div>
+      <p>零件到齊，插上 PyTorch 的 <code class="inl">DataLoader</code> 就完工。有個小巧思：用 <code class="inl">functools.partial</code> 把 <code class="inl">device</code> 和 <code class="inl">allowed_max_length=1024</code> 預先「綁」進 collate——資料在 loader 的背景流程就先搬上 GPU，不佔訓練主迴圈的時間：</p>
+      <pre>device = torch.device(<span class="k">"cuda"</span> if torch.cuda.is_available() else <span class="k">"cpu"</span>)  <span class="c"># Apple Silicon 可改 "mps"（結果可能略異）</span>
+customized_collate_fn = partial(custom_collate_fn, device=device, allowed_max_length=<span class="k">1024</span>)
+train_loader = DataLoader(train_dataset, batch_size=<span class="k">8</span>, collate_fn=customized_collate_fn,
+                          shuffle=<span class="k">True</span>, drop_last=<span class="k">True</span>, num_workers=0)   <span class="c"># val / test：兩者皆 False</span></pre>
+      <p>印出 train loader 的每個 batch 形狀（書中真實輸出）——注意<strong>第二個維度每批都不一樣</strong>：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># torch.manual_seed(123)</span>
+Train loader:
+torch.Size([8, <span class="tn" style="color:var(--accent);font-weight:700">61</span>]) torch.Size([8, 61])
+torch.Size([8, <span class="tn" style="color:var(--accent);font-weight:700">76</span>]) torch.Size([8, 76])
+torch.Size([8, <span class="tn" style="color:var(--accent);font-weight:700">73</span>]) torch.Size([8, 73])
+ ...
+torch.Size([8, <span class="tn" style="color:var(--accent);font-weight:700">74</span>]) torch.Size([8, 74])
+torch.Size([8, <span class="tn" style="color:var(--accent);font-weight:700">69</span>]) torch.Size([8, 69])</div></div>
+      <p><strong>切換兩種 padding 策略</strong>，看「逐 batch pad」到底省了什麼（batch 長度為書中真實值；斜紋＝浪費的 padding，為示意）：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="padSeg"><button data-m="0" class="on">逐 batch pad（本書作法）</button><button data-m="1">全資料集統一 pad</button></span></div>
+        <div id="padViz"></div>
+        <div class="stepcap" id="padCap"></div>
+      </div>
+    </section>
+
+    <!-- ===== 7.5 ===== -->
+    <section id="sec-75" data-map="s-model">
+      <div class="sh"><span class="num">7.5</span><h2>Loading a pretrained LLM（載入 355M 預訓練模型）<span class="mode infer">💬 推論</span></h2></div>
+      <div class="iocard"><span class="io in">input：OpenAI 的 gpt2-medium 權重<br>下載約 1.42 GB</span><span class="ioarrow">→</span><span class="io box">load_weights_into_gpt<small>第 5.5 節寫好的函數，直接重用</small></span><span class="ioarrow">→</span><span class="io out">output：355M 的 GPTModel<br>會英文，但還不會聽指令</span></div>
+      <p>指令跟隨比「二選一的分類」難得多，<strong>124M 的容量不夠</strong>——小模型學不動高品質指令跟隨所需的細膩模式。所以本章第一次換大模型：<span class="en">gpt2-medium（355M）</span>。載入程式碼和 5.5／6.4 完全相同，<strong>點每一行複習它為什麼長這樣</strong>（全是前幾章埋的伏筆）：</p>
+      <div class="stage">
+        <div class="codelines" id="bcLines"></div>
+        <div class="stepcap" id="bcCap">👆 點一行看說明（注意 CHOOSE_MODEL 那行——全章唯一的「升級」開關）</div>
+      </div>
+      <p><strong>四種尺寸複習</strong>（第 5 章的老朋友；點選查看，粗體為對 124M 的改動）：</p>
+      <div class="stage">
+        <div class="controls" id="szPills">
+          <button class="pill" data-s="0">gpt2-small · 124M</button>
+          <button class="pill on" data-s="1">gpt2-medium · 355M</button>
+          <button class="pill" data-s="2">gpt2-large · 774M</button>
+          <button class="pill" data-s="3">gpt2-xl · 1558M</button>
+        </div>
+        <div class="tsr" id="szTsr"></div>
+        <div class="stepcap" id="szCap"></div>
+      </div>
+      <h3>微調前的 baseline：它會怎麼回應指令？</h3>
+      <p>載入完先做一件重要的事：拿驗證集第一題測「<strong>微調前</strong>」的行為，之後才有對照組。生成用的正是第 5 章的 <code class="inl">generate()</code>（搭配 <code class="inl">text_to_token_ids</code>／<code class="inl">token_ids_to_text</code>，全部 <code class="inl">from chapter05 import</code>）：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># torch.manual_seed(123)；input_text = format_input(val_data[0])：</span>
+Below is an instruction that describes a task. Write a response that
+appropriately completes the request.
+
+### Instruction:
+Convert the active sentence to passive: 'The chef cooks the meal every day.'</div>
+      <div class="decoded" style="margin-top:10px"><span class="small lbl">355M 微調前的 response_text → </span><br>"<span class="bad2">### Response:
+
+The chef cooks the meal every day.
+
+### Instruction:
+
+Convert the active sentence to passive: 'The chef cooks the</span>"</div>
+      <div class="stepcap">它做了三件「很會接話」的事：照抄 <b>### Response:</b> 標題、把原句<b>原封不動抄回來</b>、然後自己<b>再出一次題</b>——把 prompt 的「格式」延續下去，卻完全沒有執行指令。這就是 text completion 與 instruction following 的差距，也是接下來微調要修理的行為。</div></div>
+      <div class="note"><b>伏筆回收：</b><code class="inl">load_weights_into_gpt</code> 是 5.5 節寫的那個「對名入座＋assign 形狀檢查」函數——當時搬 124M，現在只把 <code class="inl">CHOOSE_MODEL</code> 換成 <code class="inl">"gpt2-medium (355M)"</code>，同一套程式照用。這就是「同一架構、不同規模」的可擴展性紅利。</div>
+    </section>
+
+    <!-- ===== 7.6 ===== -->
+    <section id="sec-76" data-map="s-train">
+      <div class="sh"><span class="num">7.6</span><h2>Fine-tuning the LLM on instruction data（在指令資料上微調）<span class="mode train">🏋️ 訓練</span></h2></div>
+      <div class="iocard"><span class="io in">input：355M 模型 + train/val loader</span><span class="ioarrow">→</span><span class="io box">train_model_simple<small>2 epochs × 116 batches · AdamW(lr=5e-5, weight_decay=0.1)</small></span><span class="ioarrow">→</span><span class="io out">output：會照指令回答的模型<br>（外加兩條 loss 曲線）</span></div>
+      <p>訓練程式<strong>一行都不用重寫</strong>：<code class="inl">from chapter05 import calc_loss_loader, train_model_simple</code>。−100 的遮罩效果已經內建在 targets 裡，cross_entropy 自動跳過。先量微調前的 loss：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># with torch.no_grad(): calc_loss_loader(..., num_batches=5)——書中真實輸出</span>
+Training loss:   <span class="tn" style="color:var(--cool);font-weight:700">3.825908660888672</span>
+Validation loss: <span class="tn" style="color:var(--cool);font-weight:700">3.7619335651397705</span>
+
+<span class="lbl"># 對照第 5 章「未訓練」的 10.98：355M 預訓練過、早就會英文，
+# 起點只有 3.8——微調是「導正行為」，不是從零學語言。</span></div></div>
+      <p><strong>按「下一步」播放訓練過程</strong>：曲線上實心點＝書中印出的真實 loss；空心點＝依書中圖 7.17 形狀的平滑內插。下方是即時輸出與每個 epoch 結束的生成樣本——看模型怎麼一步步學會被動語態：</p>
+      <div class="stage">
+        <div class="controls">
+          <button class="btn ghost" id="plPrev">← 上一步</button>
+          <button class="btn" id="plNext">下一步 →</button>
+          <button class="btn ghost" id="plAll">跑完 2 epochs</button>
+          <button class="btn ghost" id="plReset">重置</button>
+          <span class="dots" id="plDots"></span>
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px"><canvas id="trCv" width="860" height="330"></canvas></div>
+        <div class="tsr" id="plConsole" style="margin-top:12px;max-height:150px;overflow-y:auto"></div>
+        <div class="decoded" id="plSample" style="margin-top:10px"></div>
+        <div class="stepcap" id="plCap"></div>
+      </div>
+      <div class="note"><b>超參數的兩個「為什麼」：</b>① lr=<b>5e-5</b>，比第 5 章預訓練的 4e-4 小了近一個量級——微調是「微微地調」，太大步會把預訓練學到的語言能力踩壞；② 只跑 <b>2 epochs</b>——書中明說：模型在兩輪內已有效學習，練到第 3 輪不必要、還可能開始 overfitting（第 5 章的教訓還記得吧）。</div>
+      <p>訓練要花多久？<strong>點一個裝置</strong>看書中的實測表（兩個 epoch）：</p>
+      <div class="stage">
+        <div class="controls" id="hwPills">
+          <button class="pill" data-i="0">CPU · M3 MacBook Air</button>
+          <button class="pill" data-i="1">GPU · NVIDIA L4</button>
+          <button class="pill on" data-i="2">GPU · NVIDIA A100</button>
+        </div>
+        <div class="tsr" id="hwTsr"></div>
+        <div class="stepcap" id="hwCap"></div>
+      </div>
+      <h3>驗收：同一題，微調前 vs 微調後</h3>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="bfSeg"><button data-m="0" class="on">微調前（7.5 的 baseline）</button><button data-m="1">微調 2 epochs 後</button></span></div>
+        <div class="decoded" id="bfOut"></div>
+        <div class="stepcap" id="bfCap"></div>
+      </div>
+    </section>
+
+    <!-- ===== 7.7 ===== -->
+    <section id="sec-77" data-map="s-gen">
+      <div class="sh"><span class="num">7.7</span><h2>Extracting and saving responses（抽取並保存回應）<span class="mode infer">💬 推論</span></h2></div>
+      <div class="iocard"><span class="io in">input：110 筆 test 指令</span><span class="ioarrow">→</span><span class="io box">generate → 切掉 prompt → strip<small>tqdm 迭代 · max_new_tokens=256 · eos_id=50256</small></span><span class="ioarrow">→</span><span class="io out">output：instruction-data-with-response.json<br>每筆多一個 model_response 欄位</span></div>
+      <p>微調完，換 test set 上場。先肉眼看前三題——<code class="inl">generate()</code> 回傳的是「prompt＋回應」全文，所以要用 <code class="inl">generated_text[len(input_text):]</code> 把 prompt 切掉、再 <code class="inl">.replace("### Response:", "").strip()</code>。<strong>點三題看「正解 vs 模型回應」</strong>（書中真實輸出）：</p>
+      <div class="stage">
+        <div class="controls" id="exPills">
+          <button class="pill on" data-i="0">① 明喻改寫</button>
+          <button class="pill" data-i="1">② 雷雨的雲</button>
+          <button class="pill" data-i="2">③ 傲慢與偏見</button>
+        </div>
+        <div class="tsr" id="exTsr" style="white-space:pre-wrap"></div>
+        <div class="stepcap" id="exCap"></div>
+      </div>
+      <p>三題兩對一半錯——但「半錯」該給幾分？這正是指令微調評估的難處。書中列了三條主流路線：</p>
+      <ul class="clean">
+        <li><b>選擇題測驗</b>：如 <span class="en">MMLU</span>——考知識，好計分，但測不出「對話能力」。</li>
+        <li><b>人類偏好對戰</b>：如 <span class="en">LMSYS chatbot arena</span>——兩個模型的回答讓真人盲選。</li>
+        <li><b>LLM 當裁判</b>：如 <span class="en">AlpacaEval</span>——用 GPT-4 之類的強模型自動評分。7.8 就走這條路（換成本機的 Llama 3）。</li>
+      </ul>
+      <p>評分前先把 110 筆的回應全部生出來、存檔備用（<span class="en">tqdm</span> 顯示進度條）：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># for i, entry in tqdm(enumerate(test_data), total=len(test_data)) —— 書中真實輸出</span>
+100%|██████████████████████████████| 110/110 [01:05&lt;00:00,  1.68it/s]
+<span class="lbl"># A100 約 1 分鐘；M3 MacBook Air 約 6 分鐘</span>
+
+print(test_data[0]) <span class="pn">→</span>
+{'instruction': 'Rewrite the sentence using a simile.',
+ 'input': 'The car is very fast.',
+ 'output': 'The car is as fast as lightning.',
+ <span class="tn" style="color:var(--accent);font-weight:700">'model_response': 'The car is as fast as a bullet.'</span>}
+
+<span class="lbl"># → 存成 instruction-data-with-response.json（indent=4）
+# 模型另存 gpt2-medium355M-sft.pth，之後 load_state_dict 即可重用</span></div></div>
+    </section>
+
+    <!-- ===== 7.8 ===== -->
+    <section id="sec-78" data-map="s-judge">
+      <div class="sh"><span class="num">7.8</span><h2>Evaluating the fine-tuned LLM（用另一個 LLM 評分）</h2></div>
+      <div class="iocard"><span class="io in">input：指令＋正解＋模型回應<br>（110 筆）</span><span class="ioarrow">→</span><span class="io box">評分 prompt → Llama 3 8B<small>本機 Ollama · REST API · temperature 0</small></span><span class="ioarrow">→</span><span class="io out">output：0–100 的整數分 ×110<br>平均 50.32</span></div>
+      <p>110 筆逐句人工看太慢，書中採 <span class="en">LLM-as-a-judge</span>（AlpacaEval 式的作法）：在本機用 <span class="en">Ollama</span> 跑 Meta 的 <span class="en">Llama 3 8B</span>（instruct 版），請它給每個回應打 0–100 分。<strong>點每一行看評分環境怎麼架：</strong></p>
+      <div class="stage">
+        <div class="codelines" id="olLines"></div>
+        <div class="stepcap" id="olCap">👆 點一行看說明（Ollama 只做推論，不能拿來訓練）</div>
+      </div>
+      <p>評分 prompt 長這樣（書中原文；最後一句是 Listing 7.11 加上的，讓它只回整數、方便取平均）：</p>
+      <pre>prompt = (
+    f"Given the input `{format_input(entry)}` "
+    f"and correct output `{entry['output']}`, "
+    f"score the model response `{entry['model_response']}`"
+    f" on a scale from <span class="k">0 to 100</span>, where 100 is the best score. "
+    f"<span class="k">Respond with the integer number only.</span>"
+)</pre>
+      <p><strong>點三題看 Llama 3 的評分與理由</strong>（書中真實輸出的濃縮）：</p>
+      <div class="stage">
+        <div class="controls" id="jdPills">
+          <button class="pill on" data-i="0">① 明喻 → 85 分</button>
+          <button class="pill" data-i="1">② 雲 → 40 分</button>
+          <button class="pill" data-i="2">③ 作者 → 95 分</button>
+        </div>
+        <div class="tsr" id="jdTsr" style="white-space:pre-wrap"></div>
+        <div class="stepcap" id="jdCap"></div>
+      </div>
+      <h3>對全部 110 筆取平均：50.32 分</h3>
+      <div class="stage"><div class="tsr"><span class="lbl"># generate_model_scores(test_data, "model_response")——書中真實輸出（M3 MacBook Air 約 1 分鐘）</span>
+Scoring entries: 100%|████████████████████████| 110/110 [01:10&lt;00:00,  1.56it/s]
+Number of scores: 110 of 110
+Average score: <span class="tn" style="color:var(--accent);font-weight:700">50.32</span></div></div>
+      <p><strong>50.32 分是好是壞？點下面三個刻度</strong>，用同一套評分流程的參照系來讀它（數值皆書中真實）：</p>
+      <div class="stage">
+        <div class="controls" id="scPills">
+          <button class="pill on" data-i="0">我們的 355M · 50.32</button>
+          <button class="pill" data-i="1">Llama 3 8B base · 58.51</button>
+          <button class="pill" data-i="2">Llama 3 8B instruct · 82.6</button>
+        </div>
+        <div class="pxtrack" id="scTrack"></div>
+        <div class="stepcap" id="scCap"></div>
+      </div>
+      <div class="note"><b>兩個提醒：</b>① Ollama 目前並非跨作業系統完全 deterministic——分數可能略有出入，可多跑幾次取平均；② 想要更權威的裁判，書中附了改用 <b>OpenAI GPT-4 API</b> 評分的選配 notebook——裁判愈強，分數愈可信。想繼續進步？書中列了四條路：調超參數、加大資料集、換 prompt 格式、換更大的底模。</div>
+    </section>
+
+    <!-- ===== 7.9 ===== -->
+    <section id="sec-79" data-map="all">
+      <div class="sh"><span class="num">7.9</span><h2>Conclusions（結語：旅程的終點）</h2></div>
+      <p>到這裡，你已經從 tokenizer、attention、GPT 架構、預訓練、分類微調，一路走到指令微調——<strong>真的「從零」打造了一個會聽指令的 LLM</strong>。這章也是全書 LLM 開發循環的最後一站。</p>
+      <div class="iocard">
+        <span class="io in">ch2 資料 ✓</span><span class="ioarrow">→</span>
+        <span class="io in">ch3 attention ✓</span><span class="ioarrow">→</span>
+        <span class="io in">ch4 GPT 架構 ✓</span><span class="ioarrow">→</span>
+        <span class="io in">ch5 預訓練 ✓</span><span class="ioarrow">→</span>
+        <span class="io in">ch6 分類微調 ✓</span><span class="ioarrow">→</span>
+        <span class="io box">ch7 指令微調 ✓<small>你在這裡——終點</small></span>
+      </div>
+      <div class="plain"><div class="ph">🔰 接下來去哪？</div><p>書中給的路線圖：① <b>偏好微調（preference fine-tuning）</b>——指令微調之後可選的下一步，讓模型更貼合人類偏好（RLHF／DPO 一族；本書 GitHub 的 <code class="inl">04_preference-tuning-with-dpo</code> 資料夾有完整實作）；② <b>LoRA</b>（附錄 E＋練習 7.4）——參數高效微調，同樣的事用更少的算力；③ <b>更大的資料</b>（練習 7.3）——52,002 筆的原版 Alpaca 資料集；④ 實務工具鏈——作者推薦 <span class="en">Axolotl</span>、<span class="en">LitGPT</span>；⑤ 跟上進展——arXiv 的 cs.LG、r/LocalLLaMA、作者部落格。</p></div>
+    </section>
+
+    <!-- ===== 小結 ===== -->
+    <section id="sec-sum" data-map="all">
+      <div class="sh"><span class="num">▣</span><h2>本章小結</h2></div>
+      <ul class="clean">
+        <li><b>指令微調＝老迴圈＋新資料</b>：cross_entropy、AdamW、train_model_simple 全部沿用第 5 章，資料換成 1,100 筆「指令→回應」配對（85/5/10 切成 935/55/110）。</li>
+        <li><b>Alpaca 格式</b>：固定開場白＋### Instruction／### Input／### Response；input 為空就整段省略。</li>
+        <li><b>custom_collate_fn 四件事</b>：每條 +1 個 50256 → pad 到批內最長 → inputs=padded[:-1]、targets=padded[1:] → targets 中第一個以外的 50256 換 −100；可選 allowed_max_length=1024。</li>
+        <li><b>−100 = cross_entropy 的預設 ignore_index</b>：被標的位置完全不參與 loss（書中證明 loss_1 == loss_3）；保留一個 50256 讓模型學會「講完了」。遮不遮 instruction 研究仍分歧，本書不遮。</li>
+        <li><b>355M 取代 124M</b>：小模型容量不足以學好指令跟隨；載入沿用 5.5 的 load_weights_into_gpt。微調前的 355M 只會把指令抄回來。</li>
+        <li><b>訓練實測</b>：2 epochs、lr=5e-5——loss 3.83 → train 0.300 / val 0.657；A100 0.86 分鐘、M3 筆電 15.78 分鐘；第 3 epoch 可能反而 overfitting。</li>
+        <li><b>評估</b>：generate 抽取 110 筆回應存 JSON → Ollama＋Llama 3 8B 逐筆打 0–100 分 → 平均 <b>50.32</b>（參照：Llama 3 8B base 58.51、instruct 82.6）。</li>
+        <li><b>下一步</b>：偏好微調（DPO）、LoRA、更大資料集——以及整個 LLM 開源生態。</li>
+      </ul>
+    </section>
+
+    <section id="sec-quiz" data-map="all">
+      <div class="sh"><span class="num">✓</span><h2>知識檢核</h2></div>
+      <p class="small" style="margin-bottom:14px">// 七題，作答後立即看解析</p>
+      <div class="quiz" id="quizBox"></div>
+      <div id="score" style="font-family:var(--mono);font-size:14px;color:var(--accent);margin-top:16px"></div>
+    </section>
+
+    <div class="foot">從零打造 LLM · 第 7 章互動教材 ｜ 講解為原創文字，程式碼與數值對應 Sebastian Raschka《Build a Large Language Model (From Scratch)》Ch.7 的公開程式與執行輸出，非原文翻譯<br>頁面中的計算皆為瀏覽器即時運算　·　快捷鍵 <kbd>T</kbd> 切換主題</div>
+  </main>
+</div></div>
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const root=document.documentElement;
+const css=v=>getComputedStyle(root).getPropertyValue(v).trim();
+$("#themeBtn").addEventListener("click",()=>{const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",cur==="dark"?"light":"dark");});
+addEventListener("keydown",e=>{if(e.target.matches&&e.target.matches("input,textarea"))return;if(e.key==="t"||e.key==="T")$("#themeBtn").click();});
+
+/* ===== 全域指令微調管線圖 ===== */
+const STAGES=[
+ {id:"s-data",em:"📋",label:"指令資料"},{id:"s-fmt",em:"🧩",label:"Alpaca 格式"},{id:"s-batch",em:"📦",label:"Batch＋Mask"},
+ {id:"s-model",em:"🧠",label:"GPT-2 355M"},{id:"s-train",em:"🏋️",label:"微調"},{id:"s-gen",em:"💬",label:"生成回應"},
+ {id:"s-judge",em:"🧑‍⚖️",label:"LLM 評分"}];
+$("#mapRow").innerHTML=STAGES.map((s,i)=>`<div class="mapstage" data-id="${s.id}"><span class="em">${s.em}</span>${s.label}</div>`+(i<STAGES.length-1?'<span class="mapsep">›</span>':'<span class="mapsep">✓</span>')).join("");
+$$(".mapstage").forEach(el=>el.addEventListener("click",()=>{const sec=[...$$("section")].find(s=>{const m=s.dataset.map||"";return m!=="all"&&m.split(",").includes(el.dataset.id);});if(sec){sec.scrollIntoView();}else{document.getElementById("sec-76").scrollIntoView();}}));
+function setMap(sec){
+  const raw=(sec&&sec.dataset.map)||"all";
+  const ids=raw==="all"?STAGES.map(s=>s.id):raw.split(",");
+  $$(".mapstage").forEach(el=>el.classList.toggle("lit",ids.includes(el.dataset.id)));
+  if(raw==="all"){$("#mapSub").innerHTML=`指令微調管線：資料 → Alpaca 格式 → batch（−100 遮罩）→ 355M → 微調 → 生成回應 → 交給 Llama 3 評分（最後的 ✓ 是全書終點）`;}
+  else{const lbls=ids.map(id=>STAGES.find(s=>s.id===id).label);$("#mapSub").innerHTML=`目前在：<b>${lbls.join(" · ")}</b>`;}
+}
+
+/* ===== 積木進度（9 步驟，圖 7.3）===== */
+const BRICKS=[["1","下載＋格式化","sec-72"],["2","組 batch","sec-73"],["3","data loaders","sec-74"],["4","載入 355M","sec-75"],["5","指令微調","sec-76"],["6","檢視 loss","sec-76"],["7","抽取回應","sec-77"],["8","質性評估","sec-77"],["9","LLM 評分","sec-78"]];
+$("#bricks").innerHTML=BRICKS.map(b=>`<div class="brick" data-sec="${b[2]}"><span class="ck"></span><span><b>${b[0]}</b> ${b[1]}</span></div>`).join("");
+$$(".brick").forEach(el=>el.addEventListener("click",()=>document.getElementById(el.dataset.sec).scrollIntoView()));
+const SEC_ORDER=["sec-intro","sec-71","sec-72","sec-73","sec-74","sec-75","sec-76","sec-77","sec-78","sec-79","sec-sum","sec-quiz"];
+function setBricks(curId){
+  const cur=SEC_ORDER.indexOf(curId);
+  $$(".brick").forEach(el=>{
+    const bi=SEC_ORDER.indexOf(el.dataset.sec);
+    el.classList.toggle("done",cur>bi);
+    el.classList.toggle("now",el.dataset.sec===curId);
+    el.querySelector(".ck").textContent=el.classList.contains("done")?"✓":"";
+  });
+}
+
+/* nav + prog + map + bricks */
+const secs=$$("section, .hero"),links=$$("nav.toc a");
+let secNow="";
+function onScroll(){
+  const h=document.documentElement;$("#prog").style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+"%";
+  let cur=secs[0];for(const s of secs)if(s.getBoundingClientRect().top<=150)cur=s;
+  secNow=cur.id;
+  links.forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+cur.id));
+  setMap(cur.tagName==="SECTION"?cur:null);
+  setBricks(cur.id);
+}
+addEventListener("scroll",onScroll,{passive:true});onScroll();
+
+/* ===== 7.1 指令 → 理想回應（圖 7.2 真實例）===== */
+const P71=[
+ {q:"Convert 45 kilometers to meters.",a:"45 kilometers is 45000 meters.",c:"<b>單位換算</b>：指令即輸入、理想回應即目標輸出。注意輸出是一句完整的話，不是一個類別標籤。"},
+ {q:"Provide a synonym for 'bright.'",a:"A synonym for 'bright' is 'radiant.'",c:"<b>同義詞</b>：答案其實不唯一（brilliant、luminous 也對）——「好回應」是一個範圍，這個特性會讓 7.8 的評估變得有趣。"},
+ {q:"Edit the following sentence to remove all passive voice: 'The song was composed by the artist.'",a:"The artist composed the song.",c:"<b>改寫句子</b>：指令裡直接夾帶要操作的句子。預訓練模型面對這種要求常常「接著寫」而不是「照著做」——7.5 會親眼看到。"}];
+function renderP71(i){
+  $$("#p71Pills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  const p=P71[i];
+  $("#p71Tsr").innerHTML=`<span class="small lbl">instruction（輸入）→ </span>"${p.q}"<br><span class="small lbl">desired response（目標輸出）→ </span>"<span class="nw">${p.a}</span>"`;
+  $("#p71Cap").innerHTML=p.c;
+}
+$$("#p71Pills .pill").forEach((b,i)=>b.addEventListener("click",()=>renderP71(i)));
+renderP71(0);
+
+/* ===== 7.2 資料集瀏覽器（真實 entry）===== */
+const DS=[
+ {d:`<span class="lbl"># print("Example entry:\\n", data[50]) —— 書中真實輸出</span>
+{'instruction': 'Identify the correct spelling of the following word.',
+ 'input': 'Ocassion',
+ 'output': "The correct spelling is 'Occasion.'"}`,
+  c:"標準三欄位：<b>instruction</b> 說要做什麼、<b>input</b> 是要操作的材料、<b>output</b> 是理想回應。"},
+ {d:`<span class="lbl"># print("Another example entry:\\n", data[999])</span>
+{'instruction': "What is an antonym of 'complicated'?",
+ 'input': <span class="tn" style="color:var(--bad);font-weight:700">''</span>,
+ 'output': "An antonym of 'complicated' is 'simple'."}`,
+  c:"<b>input 是空字串</b>——問題本身已經完整，不需要額外材料。這種 entry 在組 Alpaca 模板時會把整個 ### Input 段落省略（下一個互動就看得到）。"},
+ {d:`<span class="lbl"># test_data[0]（7.7 會拿它考微調後的模型）</span>
+{'instruction': 'Rewrite the sentence using a simile.',
+ 'input': 'The car is very fast.',
+ 'output': 'The car is as fast as lightning.'}`,
+  c:"先記住正解是 <b>lightning</b>——7.7 節模型會給出一個不一樣但同樣合格的答案，7.8 節 Llama 3 會為此給出 85 分。"}];
+function renderDS(i){
+  $$("#dsPills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  $("#dsTsr").innerHTML=DS[i].d;$("#dsCap").innerHTML=DS[i].c;
+}
+$$("#dsPills .pill").forEach((b,i)=>b.addEventListener("click",()=>renderDS(i)));
+renderDS(0);
+
+/* ===== 7.2 Alpaca 組裝 stepper ===== */
+const AL_E=[
+ {instr:"Identify the correct spelling of the following word.",inp:"Ocassion",out:"The correct spelling is 'Occasion.'"},
+ {instr:"What is an antonym of 'complicated'?",inp:"",out:"An antonym of 'complicated' is 'simple'."}];
+let alEntry=0,alStep=0;
+const AL_N=4;
+function renderAL(){
+  const e=AL_E[alEntry];
+  const hd=t=>`<span style="color:var(--accent);font-weight:600">${t}</span>`;
+  let h=hd("Below is an instruction that describes a task. Write a response that appropriately completes the request.");
+  if(alStep>=1)h+=`\n\n${hd("### Instruction:")}\n${e.instr}`;
+  if(alStep>=2){h+=e.inp?`\n\n${hd("### Input:")}\n<span style="color:var(--cool);font-weight:600">${e.inp}</span>`:`\n\n<span class="lbl">（input 為空字串 → 整個 ### Input 段落連標題一起省略）</span>`;}
+  if(alStep>=3){h+=`\n\n${hd("### Response:")}\n<span style="color:var(--ok);font-weight:600">${e.out}</span>`;
+    if(alEntry===0)h+=`\n\n<span class="lbl"># tokenizer.encode(full_text) → [21106, 318, 281, 12064, 326, 8477, 257, 4876, 13, …]（書中圖 7.7）</span>`;}
+  $("#alTsr").innerHTML=h;
+  const caps=[
+   "<b>step 1</b>：固定開場白——每一筆的開頭一模一樣，是給模型的「任務說明書」，也是 Alpaca 風格的正字標記。",
+   "<b>step 2</b>：接上 ### Instruction: 段落，放入 entry['instruction'] 原文。",
+   alEntry===0?"<b>step 3</b>：### Input: 段落——指令要操作的材料（要改拼字的那個錯字）。":"<b>step 3</b>：data[999] 沒有 input——<b>省略整段</b>而不是留個空白標題，避免模型學到「空欄位」的怪模式（format_input 裡一個 if 搞定）。",
+   "<b>step 4</b>：訓練時 ### Response: 後面接上正確答案（結尾再補 &lt;|endoftext|&gt;）；<b>推論時停在「### Response:」</b>讓模型自己補完。組好的全文交給 tokenizer——這串 ID 就是 7.3 組 batch 的原料。"];
+  $("#alCap").innerHTML=caps[alStep];
+  $("#alDots").innerHTML=Array.from({length:AL_N},(_,i)=>`<span class="dot2 ${i===alStep?'on':''}"></span>`).join("");
+  $("#alPrev").disabled=alStep===0;$("#alNext").disabled=alStep===AL_N-1;
+}
+$("#alNext").addEventListener("click",()=>{if(alStep<AL_N-1){alStep++;renderAL();}});
+$("#alPrev").addEventListener("click",()=>{if(alStep>0){alStep--;renderAL();}});
+$$("#alPills .pill").forEach((b,i)=>b.addEventListener("click",()=>{alEntry=i;$$("#alPills .pill").forEach((x,xi)=>x.classList.toggle("on",xi===i));renderAL();}));
+renderAL();
+
+/* ===== 7.2 切分色塊（935/55/110，每塊 55 筆）===== */
+(function(){
+  let h="";
+  for(let i=0;i<17;i++)h+='<span class="win" title="train：935 筆（85%）"></span>';
+  h+='<span class="win val" title="validation：55 筆（5%）"></span>';
+  for(let i=0;i<2;i++)h+='<span class="win test" title="test：110 筆（10%）"></span>';
+  $("#spWins").innerHTML=h;
+})();
+
+/* ===== 7.3 custom collate stepper（書中迷你例，輸出與書一致）===== */
+const EOT=50256;
+const CL_RAW=[[0,1,2,3,4],[5,6],[7,8,9]];
+const CL=CL_RAW.map(r=>{
+  const withE=[...r,EOT];
+  const padded=[...withE];while(padded.length<6)padded.push(EOT);
+  const inputs=padded.slice(0,5),targets=padded.slice(1,6);
+  let seen=false;
+  const masked=targets.map(v=>{if(v===EOT){if(seen)return -100;seen=true;}return v;});
+  return {raw:r,withE,padded,inputs,targets,masked};
+});
+function clCells(arr,rawLen){ // 對 padded/inputs：index===rawLen 是刻意加的 eot，其後是 pad
+  return arr.map((v,i)=>({v,cls:v===EOT?(i===rawLen?"eot":"pad"):(v===-100?"ign":"")}));
+}
+function tgCells(arr){ // 對 targets：第一個 50256 是 eot，其後 50256 是 pad，-100 是 ign
+  let seen=false;
+  return arr.map(v=>{
+    if(v===-100)return {v,cls:"ign"};
+    if(v===EOT){const cls=seen?"pad":"eot";seen=true;return {v,cls};}
+    return {v,cls:""};
+  });
+}
+function rowHTML(label,cells){
+  return `<div class="tokrow"><span class="rl">${label}</span>`+cells.map(c=>`<span class="cell ${c.cls}">${c.v===-100?"−100":c.v}</span>`).join("")+`</div>`;
+}
+const CL_STEPS=[
+ {cap:"<b>step 1 · 起點</b>：InstructionDataset 已把每筆「套模板＋tokenize」。這裡用書中的迷你例子——三條長度 5 / 2 / 3 的序列要組成一個 batch，但 tensor 要求等長。",
+  render:b=>rowHTML("tokens",b.raw.map(v=>({v,cls:""})))},
+ {cap:"<b>step 2 · new_item += [50256]</b>：先替每條補一個 &lt;|endoftext|&gt;。batch_max_length = max(len+1) = <b>6</b>——這個 +1 就是為它預留的位置。",
+  render:b=>rowHTML("＋eot",clCells(b.withE,b.raw.length))},
+ {cap:"<b>step 3 · pad 到 6</b>：不足的再用 50256 填滿（虛線格）。注意是 pad 到「<b>這個 batch 的最長</b>」而不是全資料集的最長——所以不同 batch 可以有不同長度（7.4 的 [8,61]、[8,76] 就是這麼來的）。",
+  render:b=>rowHTML("padded",clCells(b.padded,b.raw.length))},
+ {cap:"<b>step 4 · 錯開一格</b>：inputs = padded[:-1]、targets = padded[1:]——和第 2、5 章一模一樣的「右移」。剛才多補的那個 50256，就是為了讓最長的序列也有 target 可學。",
+  render:b=>rowHTML("inputs",clCells(b.inputs,b.raw.length))+rowHTML("targets",tgCells(b.targets))},
+ {cap:"<b>step 5 · 遮罩</b>：targets 中「第一個以外」的 50256 → −100（紅格）。第一個保留（實心紫格）——模型要學會在回應結尾說「我講完了」；其餘是純 padding，交給 −100 讓 loss 忽略。輸出與書中 tensor 完全一致。",
+  render:b=>rowHTML("inputs",clCells(b.inputs,b.raw.length))+rowHTML("targets",tgCells(b.masked))}];
+let clStep=0;
+function renderCL(){
+  const s=CL_STEPS[clStep];
+  $("#clViz").innerHTML=CL.map((b,i)=>`<div class="seqlab">seq ${i+1}（原長 ${b.raw.length}）</div>`+s.render(b)).join("");
+  $("#clCap").innerHTML=s.cap;
+  $("#clDots").innerHTML=CL_STEPS.map((_,i)=>`<span class="dot2 ${i===clStep?'on':''}"></span>`).join("");
+  $("#clPrev").disabled=clStep===0;$("#clNext").disabled=clStep===CL_STEPS.length-1;
+}
+$("#clNext").addEventListener("click",()=>{if(clStep<CL_STEPS.length-1){clStep++;renderCL();}});
+$("#clPrev").addEventListener("click",()=>{if(clStep>0){clStep--;renderCL();}});
+renderCL();
+
+/* ===== 7.3 ignore_index 互動（書中 logits 例，loss 為真實輸出）===== */
+const IG=[
+ {rows:[["[-1.0,  1.0]","0","2.1269",1],["[-0.5,  1.5]","1","0.1269",1]],
+  loss:"1.1269",tail:"",
+  cap:"<b>targets_1</b>：兩個 token。位置 1 的 target 機率低（-log p = 2.1269）、位置 2 高（0.1269），平均 = <b>1.1269</b>（書中真實輸出 tensor(1.1269)）。"},
+ {rows:[["[-1.0,  1.0]","0","2.1269",1],["[-0.5,  1.5]","1","0.1269",1],["[-0.5,  1.5]","1","0.1269",1]],
+  loss:"0.7936",tail:"",
+  cap:"<b>targets_2</b>：多算一個「答得好」的 token，平均被拉低到 <b>0.7936</b>——分母變成 3。到目前為止都符合直覺。"},
+ {rows:[["[-1.0,  1.0]","0","2.1269",1],["[-0.5,  1.5]","1","0.1269",1],["[-0.5,  1.5]","-100","（不計算）",0]],
+  loss:"1.1269",tail:"\nloss_1 == loss_3: <span style=\"color:var(--ok);font-weight:700\">tensor(True)</span>",
+  cap:"<b>targets_3</b>：第三個 target 換成 −100 → cross_entropy <b>整個跳過它</b>，loss 回到 1.1269，且 loss_1 == loss_3 → True。它不是「算了但得 0 分」，而是「分子分母都不存在」。順帶一提：換成其他不合法的 token ID 會直接報錯——−100 是 PyTorch 特別保留的預設 ignore_index。"}];
+function renderIG(i){
+  $$("#igSeg button").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  const g=IG[i];
+  let h=`<span class="lbl"># logits（每列＝一個 token 位置的 2 類 logits）    target    -log p(target)</span>\n`;
+  h+=g.rows.map(r=>{
+    const line=`${r[0]}                                 ${String(r[1]).padStart(4)}      ${r[2]}`;
+    return r[3]?line:`<span style="opacity:.4">${line}   ← ignore_index=-100，完全不參與</span>`;
+  }).join("\n");
+  h+=`\n\nloss = 被計入位置的平均 = <span style="color:var(--accent);font-weight:700">${g.loss}</span>${g.tail}`;
+  $("#igTsr").innerHTML=h;$("#igCap").innerHTML=g.cap;
+}
+$$("#igSeg button").forEach((b,i)=>b.addEventListener("click",()=>renderIG(i)));
+renderIG(0);
+
+/* ===== 7.4 padding 策略對照 ===== */
+const PB=[["batch 1",61],["batch 2",76],["batch 3",73],null,["batch 115",74],["batch 116",69]];
+let padMode=0;
+function renderPad(){
+  const wmax=420,gmax=76;
+  $("#padViz").innerHTML=PB.map(b=>{
+    if(!b)return `<div class="tokrow"><span class="rl">…</span><span class="small">（每個 epoch 共 116 個 batch）</span></div>`;
+    const w=Math.round(b[1]/gmax*wmax);
+    const waste=padMode?`<div style="flex:none;width:${Math.round((gmax-b[1])/gmax*wmax)}px;height:16px;border-radius:4px;background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,var(--line) 4px,var(--line) 6px);border:1px dashed var(--line-strong)"></div>`:"";
+    return `<div class="tokrow" style="gap:6px"><span class="rl">${b[0]}</span><div style="flex:none;width:${w}px;height:16px;border-radius:4px;background:var(--accent);opacity:.85"></div>${waste}<span class="small">[8, ${padMode?gmax:b[1]}]</span></div>`;
+  }).join("");
+  $("#padCap").innerHTML=padMode
+   ?`<b>統一 pad（對照組）</b>：所有 batch 都拉到同一長度（這裡以 76 為例示意；真實全域最長可能更長，上限 1024）。斜紋部分全是廢 token——forward 照算、記憶體照佔。資料愈參差，浪費愈可觀。`
+   :`<b>逐 batch pad（本書作法）</b>：collate 只 pad 到「該 batch 的最長」——第 1 個 batch [8, 61]、第 2 個 [8, 76]……每批形狀不同完全沒問題，模型本來就吃任意長度。這就是自己寫 collate（而不是在 Dataset 裡先 pad 死）換來的效率。`;
+}
+$$("#padSeg button").forEach((b,i)=>b.addEventListener("click",()=>{$$("#padSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");padMode=i;renderPad();}));
+renderPad();
+
+/* ===== 7.5 BASE_CONFIG codelines ===== */
+const BC=[
+ ['BASE_CONFIG = {',null],
+ ['    "vocab_size": 50257,','詞彙表大小：從第 2 章用到現在，沒變過。'],
+ ['    "context_length": 1024,','OpenAI 權重按 1024 訓練（wpe 表形狀固定），載權重就得用 1024——第 5.5 節的伏筆。7.4 的 allowed_max_length=1024 也是為了守住這條上限。'],
+ ['    "drop_rate": 0.0,','dropout 關成 0——第 6 章開始的慣例：微調階段資料會反覆看，且現代實務發現 dropout 對微調幫助不大。'],
+ ['    "qkv_bias": True','原始 GPT-2 的 Q/K/V Linear 有 bias——要用人家的權重就得遷就人家的設定（5.5 的老朋友）。'],
+ ['}',null],
+ ['CHOOSE_MODEL = "gpt2-medium (355M)"   # ← 全章唯一的升級開關','把第 5、6 章的 "gpt2-small (124M)" 換成 medium。下載約 1.42 GB（約為 124M 的 3 倍）。書中逃生門：硬體不夠就改回 124M，程式其餘部分完全不變。'],
+ ['model = GPTModel(BASE_CONFIG)','第 4 章的 GPTModel，只是 config 變成 emb_dim 1024 × 24 層 × 16 頭。'],
+ ['load_weights_into_gpt(model, params); model.eval()','5.5 節的搬權重函數直接重用——assign() 的形狀檢查會保證 355M 的每個 tensor 對位成功。']];
+$("#bcLines").innerHTML=BC.map((c,i)=>`<div class="cl" data-i="${i}" style="cursor:${c[1]?'pointer':'default'}">${c[0]}</div>`).join("");
+$$("#bcLines .cl").forEach(el=>el.addEventListener("click",()=>{
+  const c=BC[+el.dataset.i];if(!c[1])return;
+  $$("#bcLines .cl").forEach(x=>x.classList.remove("lit"));el.classList.add("lit");
+  $("#bcCap").innerHTML="<b>"+c[0].trim().replace(/,$/,"").slice(0,44)+"</b> — "+c[1];
+}));
+
+/* ===== 7.5 尺寸選擇 ===== */
+const SZ=[
+ ["gpt2-small (124M)",768,12,12,"第 5、6 章用的尺寸。這次書中明說：對指令跟隨「容量不足」。"],
+ ["gpt2-medium (355M)",1024,24,16,"本章的選擇：維度 +33%、層數翻倍。124M 學不動的細膩指令模式，355M 開始學得起來。"],
+ ["gpt2-large (774M)",1280,36,20,"更大更慢——書中「繼續進步」的建議之一就是換更大的底模。"],
+ ["gpt2-xl (1558M)",1600,48,25,"GPT-2 全家最大。載入方式與 355M 完全相同——改 CHOOSE_MODEL 一行。"]];
+function renderSZ(i){
+  $$("#szPills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  const s=SZ[i],base=SZ[0];
+  const hl=(v,b2)=>v===b2?String(v):`<b style="color:var(--accent)">${v}</b>`;
+  $("#szTsr").innerHTML=`model_configs["${s[0]}"] = {
+    "emb_dim":  ${hl(s[1],base[1])},     <span class="lbl"># 每個 token 的向量維度</span>
+    "n_layers": ${hl(s[2],base[2])},      <span class="lbl"># transformer block 層數</span>
+    "n_heads":  ${hl(s[3],base[3])},      <span class="lbl"># 注意力頭數</span>
+}   <span class="lbl"># vocab_size 50257 與 context_length 1024 四個尺寸皆相同</span>`;
+  $("#szCap").innerHTML=`<b>${s[0]}</b>：${s[4]}`;
+}
+$$("#szPills .pill").forEach((b,i)=>b.addEventListener("click",()=>renderSZ(i)));
+renderSZ(1);
+
+/* ===== 7.6 訓練播放器（書中真實數值＋圖 7.17 內插）===== */
+const TR_STEPS=[0,5,10,15,30,50,70,90,115,120,125,130,135,160,185,210,230];
+const TR_TRAIN=[2.637,1.174,0.872,0.857,0.78,0.72,0.65,0.58,0.520,0.438,0.453,0.448,0.408,0.38,0.35,0.32,0.300];
+const TR_VAL=[2.626,1.103,0.944,0.906,0.85,0.79,0.74,0.70,0.665,0.670,0.685,0.681,0.677,0.670,0.665,0.660,0.657];
+const TR_BOOK=[1,1,1,1,0,0,0,0,1,1,1,1,1,0,0,0,1];
+const PL_MAX=[-1,0,15,115,135,230];
+const PL_CONSOLE=[
+ [1,"Ep 1 (Step 000000): Train loss 2.637, Val loss 2.626"],
+ [2,"Ep 1 (Step 000005): Train loss 1.174, Val loss 1.103"],
+ [2,"Ep 1 (Step 000010): Train loss 0.872, Val loss 0.944"],
+ [2,"Ep 1 (Step 000015): Train loss 0.857, Val loss 0.906"],
+ [3,"[...]　# Step 20–110 的輸出，書中省略"],
+ [3,"Ep 1 (Step 000115): Train loss 0.520, Val loss 0.665"],
+ [4,"Ep 2 (Step 000120): Train loss 0.438, Val loss 0.670"],
+ [4,"Ep 2 (Step 000125): Train loss 0.453, Val loss 0.685"],
+ [4,"Ep 2 (Step 000130): Train loss 0.448, Val loss 0.681"],
+ [4,"Ep 2 (Step 000135): Train loss 0.408, Val loss 0.677"],
+ [5,"[...]"],
+ [5,"Ep 2 (Step 000230): Train loss 0.300, Val loss 0.657"],
+ [5,"Training completed in 0.87 minutes."]];
+const PL_SAMPLE={
+ 3:['Ep 1 結束的生成樣本','"### Response: The meal is <span class="nw">prepared</span> every day by the chef.&lt;|endoftext|&gt;<span class="small">The following is an instruction that describes a task…（模型講完後又開始自問自答，greedy 生成填滿額度的正常現象）</span>"'],
+ 5:['Ep 2 結束的生成樣本','"### Response: The meal is <span class="nw">cooked</span> every day by the chef.&lt;|endoftext|&gt;<span class="small">…### Instruction: What is the capital of the United Kingdom</span>"']};
+const PL_CAPS=[
+ "起點：微調前 train/val loss ≈ 3.83 / 3.76（上方 tsr）。按「下一步」開始。",
+ "<b>第 1 步</b>就把 loss 從 3.8 打到 2.64——第一批「指令→回應」樣本立刻開始改寫模型的行為。",
+ "<b>前 15 步</b>：loss 3.8 → 0.86。這段急降＝模型快速學會 Alpaca 模板的「形」；之後的緩降才是在學「怎麼答得對」。",
+ "<b>Ep 1 結束</b>（116 個 batch）：train 0.520 / val 0.665。看樣本——已經會轉被動語態了！只是動詞選了 <b>prepared</b>，不夠精準。",
+ "<b>Ep 2 前段</b>：train 續降、val 在 0.66–0.69 徘徊——輕微 memorization 的影子開始出現，但幅度遠不像第 5 章那次誇張。",
+ "<b>終點</b>：train 0.300 / val 0.657，A100 上共 0.87 分鐘。樣本把 prepared 修成了 <b>cooked</b>——完全正確。書中提醒：練第 3 個 epoch 不必要、還可能 overfitting。空心點為依書中圖 7.17 的平滑內插。"];
+let plStop=0;
+const trCv=$("#trCv"),trx=trCv.getContext("2d");
+function drawTR(){
+  const W=trCv.width,H=trCv.height,padL=50,padR=16,padT=24,padB=40;
+  trx.clearRect(0,0,W,H);
+  const X=st=>padL+st/230*(W-padL-padR),Y=v=>padT+(1-v/3.0)*(H-padT-padB);
+  trx.font="10px ui-monospace";trx.lineWidth=1;
+  for(const g of [0,0.5,1,1.5,2,2.5,3]){trx.strokeStyle=css("--line");trx.globalAlpha=.35;trx.beginPath();trx.moveTo(padL,Y(g));trx.lineTo(W-padR,Y(g));trx.stroke();trx.globalAlpha=1;trx.fillStyle=css("--faint");trx.fillText(g.toFixed(1),padL-28,Y(g)+3);}
+  for(const t of [0,50,100,150,200,230]){trx.fillStyle=css("--faint");trx.fillText(String(t),X(t)-8,H-padB+14);}
+  trx.fillStyle=css("--faint");trx.fillText("loss",8,16);trx.fillText("steps →（935 筆 ÷ batch 8 ≈ 116 步/epoch）",W/2-120,H-8);
+  const maxStep=PL_MAX[plStop];
+  if(maxStep>=115){trx.strokeStyle=css("--faint");trx.setLineDash([4,4]);trx.globalAlpha=.7;trx.beginPath();trx.moveTo(X(116),padT);trx.lineTo(X(116),H-padB);trx.stroke();trx.setLineDash([]);trx.globalAlpha=1;trx.fillStyle=css("--faint");trx.fillText("Ep 1 ｜ Ep 2",X(116)-32,padT+10);}
+  function curve(data,color,dash){
+    trx.strokeStyle=color;trx.lineWidth=2.4;if(dash)trx.setLineDash([6,4]);
+    trx.beginPath();let started=false;
+    TR_STEPS.forEach((st,i)=>{if(st>maxStep)return;const x=X(st),y=Y(data[i]);started?trx.lineTo(x,y):trx.moveTo(x,y);started=true;});
+    trx.stroke();trx.setLineDash([]);
+    TR_STEPS.forEach((st,i)=>{if(st>maxStep)return;const x=X(st),y=Y(data[i]);
+      trx.beginPath();trx.arc(x,y,3.4,0,7);
+      if(TR_BOOK[i]){trx.fillStyle=color;trx.fill();}
+      else{trx.fillStyle=css("--surface-2");trx.fill();trx.strokeStyle=color;trx.lineWidth=1.4;trx.stroke();}});
+  }
+  if(maxStep>=0){curve(TR_VAL,css("--cool"),true);curve(TR_TRAIN,css("--accent"),false);}
+  trx.font="12px ui-monospace";
+  trx.fillStyle=css("--accent");trx.fillText("── train loss",W-padR-150,20);
+  trx.fillStyle=css("--cool");trx.fillText("╌╌ val loss",W-padR-150,38);
+  if(maxStep<0){trx.fillStyle=css("--faint");trx.fillText("按「下一步」開始微調（共 2 個 epoch）",W/2-130,H/2);}
+}
+function renderPL(){
+  drawTR();
+  $("#plDots").innerHTML=PL_CAPS.map((_,i)=>`<span class="dot2 ${i===plStop?'on':''}"></span>`).join("");
+  const lines=PL_CONSOLE.filter(l=>l[0]<=plStop).map(l=>l[1]);
+  $("#plConsole").innerHTML=`<span class="lbl"># train_model_simple(...) 即時輸出（AdamW lr=5e-5, weight_decay=0.1 · 2 epochs · 書中真實數值）</span>\n`+(lines.length?lines.join("\n"):"<span class='pn'>（尚未開始）</span>");
+  const sm=PL_SAMPLE[plStop];
+  if(sm){$("#plSample").innerHTML=`<span class="small lbl">${sm[0]} → </span>${sm[1]}`;}
+  else{$("#plSample").innerHTML=`<span class="small lbl">生成樣本 → </span><span class="small">（每個 epoch 結束才會印一段——樣本出現在第 4、6 步）</span>`;}
+  $("#plCap").innerHTML=PL_CAPS[plStop];
+  $("#plPrev").disabled=plStop===0;$("#plNext").disabled=plStop===PL_CAPS.length-1;
+  const con=$("#plConsole");con.scrollTop=con.scrollHeight;
+}
+$("#plNext").addEventListener("click",()=>{if(plStop<PL_CAPS.length-1){plStop++;renderPL();}});
+$("#plPrev").addEventListener("click",()=>{if(plStop>0){plStop--;renderPL();}});
+$("#plAll").addEventListener("click",()=>{plStop=PL_CAPS.length-1;renderPL();});
+$("#plReset").addEventListener("click",()=>{plStop=0;renderPL();});
+renderPL();
+
+/* ===== 7.6 硬體實測表 ===== */
+const HW=[
+ ["CPU · M3 MacBook Air","15.78","5.74","純 CPU 的筆電也只要一刻鐘——355M＋2 epochs 的親民之處。"],
+ ["GPU · NVIDIA L4","1.83","0.69","雲端入門 GPU：比筆電快約 8 倍。程式碼零修改，PyTorch 自動用上 GPU。"],
+ ["GPU · NVIDIA A100","0.86","0.39","書中結果採用的配置：52 秒跑完兩個 epoch。"]];
+function renderHW(i){
+  $$("#hwPills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  const h=HW[i];
+  $("#hwTsr").innerHTML=`<span class="lbl"># 兩個 epoch 的實測訓練時間（書中表格）— ${h[0]}</span>
+gpt2-medium (355M)   <span class="tn" style="color:var(--accent);font-weight:700">${h[1].padStart(5)} 分鐘</span>   <span class="lbl"># ← 本章使用</span>
+gpt2-small  (124M)   ${h[2].padStart(5)} 分鐘   <span class="lbl"># 硬體不夠的逃生門：改 CHOOSE_MODEL 一行</span>`;
+  $("#hwCap").innerHTML=`<b>${h[0]}</b>：${h[3]}`;
+}
+$$("#hwPills .pill").forEach((b,i)=>b.addEventListener("click",()=>renderHW(i)));
+renderHW(2);
+
+/* ===== 7.6 微調前後對照 ===== */
+const BF=[
+ ['<span class="small lbl">「Convert the active sentence to passive: \'The chef cooks the meal every day.\'」微調前 → </span><br>"<span class="bad2">### Response:  The chef cooks the meal every day.  ### Instruction:  Convert the active sentence to passive: \'The chef cooks the</span>"',
+  '照抄標題、照抄原句、然後自己再出一次題——很會「接話」，完全不會「照做」。'],
+ ['<span class="small lbl">同一題，微調 2 epochs 後 → </span><br>"<span class="nw">The meal is cooked every day by the chef.</span>"',
+  '正確轉成被動語態，答完就停（學會輸出 &lt;|endoftext|&gt; 了——7.3 保留第一個 50256 的伏筆在此回收）。同一個模型、同一個 generate()，差別只在 2 個 epoch 的指令微調。']];
+function renderBF(i){
+  $$("#bfSeg button").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  $("#bfOut").innerHTML=BF[i][0];$("#bfCap").innerHTML=BF[i][1];
+}
+$$("#bfSeg button").forEach((b,i)=>b.addEventListener("click",()=>renderBF(i)));
+renderBF(0);
+
+/* ===== 7.7 test 三題對照 ===== */
+const EX=[
+ {t:`<span style="color:var(--accent);font-weight:600">### Instruction:</span> Rewrite the sentence using a simile.
+<span style="color:var(--accent);font-weight:600">### Input:</span> The car is very fast.
+
+Correct response  &gt;&gt; The car is as fast as <span style="color:var(--ok);font-weight:700">lightning</span>.
+Model response    &gt;&gt; The car is as fast as <span style="color:var(--accent);font-weight:700">a bullet</span>.`,
+  c:"<b>✓ 合格</b>——和標準答案不同，但明喻正確且貼切（子彈以快聞名）。「答案不唯一」正是指令任務的常態。"},
+ {t:`<span style="color:var(--accent);font-weight:600">### Instruction:</span> What type of cloud is typically associated with thunderstorms?
+
+Correct response  &gt;&gt; The type of cloud typically associated with thunderstorms is <span style="color:var(--ok);font-weight:700">cumulonimbus</span>.
+Model response    &gt;&gt; The type of cloud associated with thunderstorms is a <span style="color:var(--bad);font-weight:700">cumulus</span> cloud.`,
+  c:"<b>✗ 接近但錯</b>——正解是積雨雲（cumulonimbus），模型答了積雲（cumulus）。書中補充：積雲確實可能「發展成」積雨雲——半對的答案，該給幾分？留給 7.8 的裁判。"},
+ {t:`<span style="color:var(--accent);font-weight:600">### Instruction:</span> Name the author of 'Pride and Prejudice.'
+
+Correct response  &gt;&gt; <span style="color:var(--ok);font-weight:700">Jane Austen.</span>
+Model response    &gt;&gt; The author of 'Pride and Prejudice' is <span style="color:var(--accent);font-weight:700">Jane Austen</span>.`,
+  c:"<b>✓ 正確</b>——只是多複述了一次題目，略冗。整體來看：三題兩對一「半錯」，模型表現相當不錯。"}];
+function renderEX(i){
+  $$("#exPills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  $("#exTsr").innerHTML=EX[i].t;$("#exCap").innerHTML=EX[i].c;
+}
+$$("#exPills .pill").forEach((b,i)=>b.addEventListener("click",()=>renderEX(i)));
+renderEX(0);
+
+/* ===== 7.8 Ollama 流程 codelines ===== */
+const OL=[
+ ['$ ollama serve                    # 或直接開 Ollama 應用程式','讓 Ollama 常駐背景——它是開源 llama.cpp 的包裝（純 C/C++ 的高效推論引擎），評分全程都要保持執行。注意：Ollama 只能推論，不能訓練。'],
+ ['$ ollama run llama3               # 第一次會下載 4.7 GB','抓 Meta 的 Llama 3 8B instruct 版。8B 約需 16 GB RAM；不夠可換 phi3（3.8B、約 8 GB），行有餘力可上 llama3:70b。'],
+ ['check_if_running("ollama")        # psutil 檢查 → True','評分程式開頭先確認 Ollama 活著，不在就 raise RuntimeError——避免跑到一半白等。'],
+ ['query_model(prompt, model="llama3")','不走互動模式，改打本機 REST API（http://localhost:11434/api/chat）——一個 urllib 就搞定，方便在迴圈裡逐筆評分。'],
+ ['    "options": {"seed": 123, "temperature": 0, "num_ctx": 2048}','盡量關掉隨機性讓評分可重現。書中仍提醒：Ollama 目前並非完全 deterministic，分數可能略有出入——可多跑幾次取平均。']];
+$("#olLines").innerHTML=OL.map((c,i)=>`<div class="cl" data-i="${i}" style="cursor:pointer">${c[0]}</div>`).join("");
+$$("#olLines .cl").forEach(el=>el.addEventListener("click",()=>{
+  const c=OL[+el.dataset.i];
+  $$("#olLines .cl").forEach(x=>x.classList.remove("lit"));el.classList.add("lit");
+  $("#olCap").innerHTML="<b>"+c[0].trim().slice(0,40)+"</b> — "+c[1];
+}));
+
+/* ===== 7.8 Llama 3 評分例 ===== */
+const JD=[
+ {t:`Dataset response &gt;&gt; The car is as fast as lightning.
+Model response   &gt;&gt; The car is as fast as a bullet.
+
+Llama 3 → <span style="color:var(--accent);font-weight:700">85 / 100</span>
+<span class="lbl">理由（書中輸出摘要）：明喻用得正確、比喻合理（子彈以高速聞名）、
+"as fast as" 句型正確；僅因不如 lightning 生動而略扣。"the model did a great job!"</span>`,
+  c:"評審看的不是「和正解逐字相同」，而是<b>語意與任務要求</b>——這正是 LLM 裁判勝過字串比對的地方。"},
+ {t:`Dataset response &gt;&gt; ...cloud typically associated with thunderstorms is cumulonimbus.
+Model response   &gt;&gt; ...cloud associated with thunderstorms is a cumulus cloud.
+
+Llama 3 → <span style="color:var(--bad);font-weight:700">40 / 100</span>
+<span class="lbl">理由：正確抓到「雷雨與雲有關」，但雲種答錯（cumulus ≠ cumulonimbus）、
+精確度不足——屬於重大錯誤，但仍給了部分分。</span>`,
+  c:"<b>部分分</b>是重點：答案「半對」時，Llama 3 能給出 40 這種中間值——比人工二分「對／錯」更貼近真實品質。"},
+ {t:`Dataset response &gt;&gt; Jane Austen.
+Model response   &gt;&gt; The author of 'Pride and Prejudice' is Jane Austen.
+
+Llama 3 → <span style="color:var(--ok);font-weight:700">95 / 100</span>
+<span class="lbl">理由：答案正確、清楚、無文法問題；僅因「重複題目、略冗」扣 5 分。
+（書中彩蛋：Llama 3 說 "I'd rate my own response as 95…"——把答案當成自己寫的了。）</span>`,
+  c:"就算裁判偶爾出這種小狀況，對 110 筆<b>取平均</b>之後，個別的雜訊會被稀釋——這是自動評分能當指標的原因。"}];
+function renderJD(i){
+  $$("#jdPills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  $("#jdTsr").innerHTML=JD[i].t;$("#jdCap").innerHTML=JD[i].c;
+}
+$$("#jdPills .pill").forEach((b,i)=>b.addEventListener("click",()=>renderJD(i)));
+renderJD(0);
+
+/* ===== 7.8 分數標尺 ===== */
+const SC=[
+ [50.32,"我們的 355M（微調後）","<b>50.32</b>：不是「一半錯」，而是滿分、部分分混合的平均（85、40、95…）。對一個筆電可訓練、從零打造的 355M 模型，這是紮實的起點，也是之後改進實驗的基準線。"],
+ [58.51,"Llama 3 8B base（未指令微調）","<b>58.51</b>：用同一套流程測「只預訓練、沒微調」的 Llama 3 8B base——我們微調後的 355M 已經追到比自己大 22 倍的 base 模型附近。"],
+ [82.6,"Llama 3 8B instruct","<b>82.6</b>：在大規模指令資料上微調過的 instruct 版——顯示「更大的模型 × 更大的指令資料集」還有多少空間。想要更權威的對照，書中另附 GPT-4 API 評分的 notebook。"]];
+function renderSC(i){
+  $$("#scPills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  const pos=v=>(v/100*100).toFixed(2)+"%";
+  $("#scTrack").innerHTML=[[0,"0"],[25,""],[50.32,"50.32 我們的 355M"],[58.51,"58.51 L3 base"],[82.6,"82.6 L3 instruct"],[100,"100"]]
+    .filter(m=>m[1]!=="").map(m=>`<div class="pxmark" style="left:${pos(m[0])}"><span>${m[1]}</span></div>`).join("")
+    +`<div class="pxdot" style="left:${pos(SC[i][0])}"></div>`;
+  $("#scCap").innerHTML=SC[i][2];
+}
+$$("#scPills .pill").forEach((b,i)=>b.addEventListener("click",()=>renderSC(i)));
+renderSC(0);
+
+/* ===== quiz ===== */
+const quiz=[
+ {q:"指令微調要解決預訓練模型的什麼問題？",o:["模型不會英文","模型只會「接話」（text completion），面對具體指令常常照抄或接著出題，而不是執行","模型參數太少","tokenizer 不支援指令"],a:1,e:"7.5 的 baseline 是鐵證：355M 面對「改成被動語態」的指令，把原句抄回來、還自己再出一題。指令微調用「指令→理想回應」配對把接話本能導向回應指令。"},
+ {q:"Alpaca 格式中，當 entry 的 input 欄位是空字串時？",o:["填入 0","保留空白的 ### Input: 標題","整個 ### Input 段落連標題一起省略","丟棄該筆資料"],a:2,e:"format_input 用一個 if 判斷：input 為空就整段省略，避免模型看到空欄位學出怪模式——data[999]（antonym 那筆）就是實例。"},
+ {q:"custom_collate_fn 中，為什麼 targets 保留第一個 50256、其餘全換 −100？",o:["節省記憶體","第一個 50256 是「回應結束」的訊號，要讓模型學會生成它；其餘只是對齊長度的 padding，不值得學","PyTorch 規定至少留一個","為了加快收斂"],a:1,e:"模型學會輸出 <|endoftext|> 之後，generate(..., eos_id=50256) 才知道何時停筆；其餘 padding 交給 −100 讓 loss 忽略。"},
+ {q:"−100 憑什麼讓 loss「跳過」某些位置？",o:["它會讓梯度變 0 但仍計入平均","它是 PyTorch cross_entropy 預設的 ignore_index，被標的位置完全不參與 loss（分子分母都不算）","它是特殊 token ID","它會被 softmax 濾掉"],a:1,e:"cross_entropy(..., ignore_index=-100) 是預設值。書中證據：targets_3=[0,1,-100] 的 loss_3 與只有兩個 token 的 loss_1 完全相等（1.1269，tensor(True)）。"},
+ {q:"本章為什麼把模型從 124M 換成 355M？",o:["124M 已停止提供下載","355M 訓練比較快","指令跟隨需要的容量較大，124M 學不動高品質指令跟隨的細膩模式","355M 的 tokenizer 不同"],a:2,e:"書中明說 124M「capacity 不足」。代價是下載約 1.42 GB、訓練變慢（A100 0.86 分 vs 0.39 分）——載入程式碼完全不變，只改 CHOOSE_MODEL 一行。"},
+ {q:"除了遮 padding，也可以把 targets 裡「instruction 部分」遮成 −100。本書的立場是？",o:["必須遮，否則模型會背題目","絕對不能遮","研究仍分歧（Shi et al. 2024 發現不遮往往更好），本書選擇不遮、留作練習","PyTorch 不支援這種遮法"],a:2,e:"圖 7.13 示範了遮 instruction 的作法，但《Instruction Tuning With Loss Over Instructions》顯示不遮可能表現更好——本書只遮 padding，把遮 instruction 留作練習 7.2。"},
+ {q:"平均 50.32 分是怎麼來的？該怎麼解讀？",o:["模型答對了一半的題目","Llama 3 對 110 筆 test 回應各打 0–100 分後取平均；對照 Llama 3 8B base 的 58.51、instruct 的 82.6，是個紮實的起點","是訓練 loss 換算的百分比","人工打分的平均"],a:1,e:"LLM-as-a-judge：每筆的分數混合了滿分與部分分（85 / 40 / 95…）。50.32 本身沒有絕對意義，但作為與其他模型、其他訓練設定比較的基準線非常好用。"}];
+const qc=$("#quizBox");let ans=0,cor=0;
+quiz.forEach((it,qi)=>{const w=document.createElement("div");w.className="q";w.innerHTML=`<div class="qn">Q${qi+1} / ${quiz.length}</div><div class="qt">${it.q}</div>`;
+ it.o.forEach((o,oi)=>{const b=document.createElement("button");b.className="opt";b.innerHTML=o+'<span class="mk"></span>';
+  b.addEventListener("click",()=>{if(w.dataset.done)return;w.dataset.done=1;ans++;const ok=oi===it.a;if(ok)cor++;b.classList.add(ok?"correct":"wrong");b.querySelector(".mk").textContent=ok?"✓":"✗";if(!ok){const cb=w.querySelectorAll(".opt")[it.a];cb.classList.add("correct");cb.querySelector(".mk").textContent="✓";}w.querySelector(".exp").classList.add("show");if(ans===quiz.length)$("#score").textContent=`完成 ✓ 答對 ${cor} / ${quiz.length} 題`;});
+  w.appendChild(b);});
+ const ex=document.createElement("div");ex.className="exp";ex.textContent="▸ "+it.e;w.appendChild(ex);qc.appendChild(w);});
+
+/* 主題切換重繪 */
+new MutationObserver(()=>{drawTR();}).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{drawTR();});
+})();
+</script>
+</body>
+</html>

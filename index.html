@@ -29,8 +29,26 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--faint);padding:36px 
   <header>
     <p class="eyebrow">Twinkle AI · Interactive Labs</p>
     <h1>從零打造 LLM<br>互動教材</h1>
-    <p class="lede">動手操作、即時計算的 LLM 教學頁——tensor 用真實數值呈現、每個概念配一個互動元件。目前發布第 4、5 章，其餘章節陸續上線。</p>
+    <p class="lede">動手操作、即時計算的 LLM 教學頁——tensor 用真實數值呈現、每個概念配一個互動元件。七個章節全數上線，照書的順序從第 1 章開始，或直接跳到你感興趣的主題。</p>
   </header>
+  <a class="card" href="ch01.html" style="border-left-color:#6f9ede">
+    <div class="cnum">Chapter 1</div>
+    <div class="ctitle">🧭 理解大型語言模型</div>
+    <div class="cdesc">AI⊃ML⊃DL⊃LLM 圈層探索器 · transformer 家族（BERT vs GPT）· GPT-3 訓練資料規模長條 · 自回歸接龍動畫 · zero-shot vs few-shot · 三階段路線圖</div>
+    <div class="cgo" style="color:#6f9ede">開始學習 →</div>
+  </a>
+  <a class="card" href="ch02.html" style="border-left-color:#3cbf94">
+    <div class="cnum">Chapter 2</div>
+    <div class="ctitle">✂️ 處理文字資料</div>
+    <div class="cdesc">斷詞實驗器 · tokenizer encode/decode 往返 · &lt;|unk|&gt; 與 BPE 子詞探索 · 滑動視窗取樣滑桿 · embedding 查表（seed 123 真實矩陣）· token+position 組裝</div>
+    <div class="cgo" style="color:#3cbf94">開始學習 →</div>
+  </a>
+  <a class="card" href="ch03.html" style="border-left-color:#d074a6">
+    <div class="cnum">Chapter 3</div>
+    <div class="ctitle">🎯 實作注意力機制</div>
+    <div class="cdesc">點積相似度 hover 實驗 · 6×6 注意力熱度矩陣 · QKV 投影 stepper（書中真實數值）· √d 縮放實驗 · causal mask 兩做法對照 · multi-head 切分視覺化</div>
+    <div class="cgo" style="color:#d074a6">開始學習 →</div>
+  </a>
   <a class="card" href="ch04.html">
     <div class="cnum">Chapter 4</div>
     <div class="ctitle">🏗️ 從零實作一個能生成文字的 GPT 模型</div>
@@ -43,7 +61,18 @@ footer{font-family:var(--mono);font-size:11.5px;color:var(--faint);padding:36px 
     <div class="cdesc">cross entropy 六步推導（書中真實數值）· perplexity 標尺 · train/val 切分視覺化 · 10-epoch 訓練播放器（overfitting 實錄）· temperature / top-k 抽樣實驗 · GPT-2 權重對應搬運</div>
     <div class="cgo" style="color:#26b6a7">開始學習 →</div>
   </a>
-  <div class="card soon"><div class="cnum">Chapters 1–3 · 6–7</div><div class="ctitle">陸續上線</div></div>
+  <a class="card" href="ch06.html" style="border-left-color:#e2694f">
+    <div class="cnum">Chapter 6</div>
+    <div class="ctitle">📨 分類任務微調</div>
+    <div class="cdesc">spam 資料平衡/切分視覺化 · tokenize+pad 探索器 · 凍結策略與可訓練參數 · 為何取最後一個 token · 5-epoch 訓練播放器（95.67% 測試準確率）· 上場判定 demo</div>
+    <div class="cgo" style="color:#e2694f">開始學習 →</div>
+  </a>
+  <a class="card" href="ch07.html" style="border-left-color:#8b7bf0">
+    <div class="cnum">Chapter 7</div>
+    <div class="ctitle">🗣️ 指令跟隨微調</div>
+    <div class="cdesc">Alpaca 格式組裝 · custom collate 五步 stepper（-100 遮罩）· ignore_index 互動 · GPT-2 355M 微調播放器 · 微調前後對照 · Llama 3 當裁判打分數</div>
+    <div class="cgo" style="color:#8b7bf0">開始學習 →</div>
+  </a>
   <footer>
     Twinkle AI 社群教材 ｜ 原創互動講義，主題對應 Sebastian Raschka《Build a Large Language Model (From Scratch)》，非原文翻譯。<br>
     頁面中的數值皆為瀏覽器即時計算。

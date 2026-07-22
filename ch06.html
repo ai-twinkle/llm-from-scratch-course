@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ch6 分類任務微調｜互動教材</title>
+<style>
+:root{
+  --accent:#d24d3a;--accent-soft:#e5715f;--accent-ghost:rgba(210,77,58,.12);
+  --bg:#eae6e4;--grid:rgba(30,20,18,.05);--surface:#f8f4f3;--surface-2:#eee7e5;
+  --ink:#201513;--muted:#655551;--faint:#948580;
+  --line:rgba(30,20,18,.14);--line-strong:rgba(30,20,18,.28);
+  --ok:#3f8a52;--bad:#b0366b;--cool:#2f6fb0;--ham:#3f8a68;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"PingFang TC","Noto Sans TC","Segoe UI",sans-serif;
+  --maxw:1220px;--read:68ch;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#100b0a;--grid:rgba(229,113,95,.06);--surface:#1a1210;--surface-2:#221715;
+  --ink:#ecdfdb;--muted:#a3908a;--faint:#71605b;--line:rgba(240,225,220,.13);--line-strong:rgba(240,225,220,.26);
+  --accent:#e2694f;--accent-soft:#ef8a72;--accent-ghost:rgba(226,105,79,.15);--ok:#5faf70;--bad:#e0679d;--cool:#6f9ede;--ham:#5fb086;}}
+:root[data-theme="light"]{--bg:#eae6e4;--grid:rgba(30,20,18,.05);--surface:#f8f4f3;--surface-2:#eee7e5;--ink:#201513;--muted:#655551;--faint:#948580;--line:rgba(30,20,18,.14);--line-strong:rgba(30,20,18,.28);--accent:#d24d3a;--accent-soft:#e5715f;--accent-ghost:rgba(210,77,58,.12);--ok:#3f8a52;--bad:#b0366b;--cool:#2f6fb0;--ham:#3f8a68;}
+:root[data-theme="dark"]{--bg:#100b0a;--grid:rgba(229,113,95,.06);--surface:#1a1210;--surface-2:#221715;--ink:#ecdfdb;--muted:#a3908a;--faint:#71605b;--line:rgba(240,225,220,.13);--line-strong:rgba(240,225,220,.26);--accent:#e2694f;--accent-soft:#ef8a72;--accent-ghost:rgba(226,105,79,.15);--ok:#5faf70;--bad:#e0679d;--cool:#6f9ede;--ham:#5fb086;}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.68;-webkit-font-smoothing:antialiased;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:30px 30px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+a{color:var(--accent)}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:70;transition:width .1s}
+header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 88%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:52px}
+.brand{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px}.brand b{color:var(--ink)}
+.chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--accent);color:var(--accent);border-radius:2px}
+.spacer{flex:1}.tbtn{font-family:var(--mono);font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:3px;padding:5px 10px;cursor:pointer}.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+/* 全域分類微調管線圖 */
+.map{position:sticky;top:52px;z-index:49;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:8px 0 6px}
+.map .wrap{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:none}
+.map .wrap::-webkit-scrollbar{display:none}
+.mapstage{flex:none;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);cursor:pointer;transition:.25s;white-space:nowrap}
+.mapstage .em{font-size:12px}
+.mapstage:hover{border-color:var(--accent-soft)}
+.mapstage.lit{background:var(--accent);color:#2b0c06;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ghost)}
+.mapsep{flex:none;color:var(--faint);padding:0 2px;font-size:11px}
+.mapsub{font-family:var(--mono);font-size:11px;color:var(--accent);padding:3px 0 0;min-height:16px}
+.mapsub b{color:var(--ink)}
+@media(max-width:700px){.mapstage{font-size:10px;padding:4px 7px}}
+/* layout */
+.shell{display:grid;grid-template-columns:186px minmax(0,1fr);gap:40px;padding-top:28px}
+@media(max-width:960px){.shell{grid-template-columns:1fr;gap:0}}
+nav.toc{position:sticky;top:118px;align-self:start;font-family:var(--mono);font-size:12px;max-height:calc(100vh - 140px);overflow:auto}
+@media(max-width:960px){nav.toc{display:none}}
+nav.toc .lbl{color:var(--faint);letter-spacing:.14em;font-size:10px;text-transform:uppercase;margin-bottom:10px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--ink);border-color:var(--line-strong)}nav.toc a.active{color:var(--accent);border-color:var(--accent)}
+main{min-width:0}
+.hero{padding:6px 0 26px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(26px,4.6vw,42px);line-height:1.06;margin:0;letter-spacing:-.01em}
+h1 .sub{display:block;font-size:clamp(14px,2.2vw,18px);color:var(--muted);font-weight:500;margin-top:10px}
+.lede{font-size:16px;color:var(--muted);max-width:var(--read);margin:16px 0 0}
+section{padding:38px 0;border-bottom:1px solid var(--line);scroll-margin-top:132px}
+.sh{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;flex-wrap:wrap}
+.sh .num{font-family:var(--mono);color:var(--accent);font-size:13px;font-weight:600}
+h2{font-family:var(--mono);font-weight:600;font-size:clamp(18px,2.8vw,24px);margin:0;letter-spacing:-.01em}
+h3{font-family:var(--mono);font-size:15px;margin:28px 0 8px;font-weight:600;color:var(--ink)}
+p{max-width:var(--read);margin:12px 0;color:var(--muted)}p strong,li strong{color:var(--ink)}
+.en{font-family:var(--mono);font-size:.92em;color:var(--accent);font-weight:600}
+ul.clean{max-width:var(--read);padding-left:0;list-style:none;margin:14px 0}ul.clean li{position:relative;padding-left:20px;margin:8px 0;color:var(--muted)}
+ul.clean li::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+.plain{max-width:var(--read);background:var(--accent-ghost);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 16px;margin:16px 0;font-size:14.5px;color:var(--ink)}
+.plain .ph{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent);font-weight:700;margin-bottom:5px}
+.plain p{margin:6px 0 0;color:var(--ink);max-width:none}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.small{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+canvas{display:block;width:100%;height:auto}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:14px 0}
+pre .c{color:var(--faint)}pre .k{color:var(--accent)}
+code.inl{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:var(--ink)}
+.btn{font-family:var(--mono);font-size:12.5px;padding:8px 15px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#2b0c06;cursor:pointer;font-weight:600}
+.btn.ghost{background:none;color:var(--accent)}.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font-family:var(--mono);font-size:12px;padding:7px 12px;background:var(--surface-2);border:none;border-right:1px solid var(--line);cursor:pointer;color:var(--muted)}
+.seg button:last-child{border-right:none}.seg button.on{background:var(--accent);color:#2b0c06}
+.pill{font-family:var(--mono);font-size:12px;padding:6px 11px;border:1px solid var(--line);background:var(--surface-2);border-radius:20px;cursor:pointer;color:var(--muted)}
+.pill:hover{border-color:var(--accent);color:var(--accent)}.pill.on{background:var(--accent);color:#2b0c06;border-color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+input[type=range]{-webkit-appearance:none;height:4px;border-radius:3px;background:var(--surface-2);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+/* tensor（array）呈現 */
+.tsr{font-family:var(--mono);font-size:12.5px;line-height:1.9;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.tsr .pn{color:var(--faint)}
+.tsr .lbl{color:var(--faint);font-size:11px}
+.tn{display:inline-block;padding:0 5px;border-radius:5px;transition:.12s;cursor:default}
+.tn:hover,.tn.hot{background:var(--accent);color:#2b0c06!important}
+.tn.dimmed{opacity:.35}
+.tn.neg{color:var(--cool)}
+.tsrnote{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-height:18px;margin-top:8px}
+.tsrnote b{color:var(--ink)}
+/* 積木進度（本章 8 個步驟） */
+.bricks{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin:14px 0}
+.brick{font-family:var(--mono);font-size:11.5px;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--muted);cursor:pointer;transition:.25s;display:flex;gap:8px;align-items:flex-start}
+.brick .ck{width:16px;height:16px;flex:none;border:1.5px solid var(--line-strong);border-radius:4px;display:grid;place-items:center;font-size:10px;color:#fff;margin-top:1px}
+.brick.done{border-color:var(--ok);color:var(--ink)}.brick.done .ck{background:var(--ok);border-color:var(--ok)}
+.brick.now{border-color:var(--accent);background:var(--accent-ghost);color:var(--ink);box-shadow:0 0 0 3px var(--accent-ghost)}
+.brick.now .ck{border-color:var(--accent);color:var(--accent)}
+/* 句子 chips */
+.sent{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+.wchip{font-family:var(--mono);font-size:13.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);cursor:pointer;transition:.12s}
+.wchip.hot{background:var(--accent);color:#2b0c06;border-color:var(--accent)}
+.wchip small{display:block;font-size:9.5px;color:var(--faint);text-align:center}
+.wchip.hot small{color:#2b0c06}
+/* stepper 共用 */
+.stepbar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.dots{display:flex;gap:6px;align-items:center;margin-left:auto}
+.dot2{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}.dot2.on{background:var(--accent)}
+.stepcap{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--accent-ghost);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;padding:11px 14px;margin-top:12px;min-height:42px}
+.stepcap b{color:var(--accent)}
+/* code-line stepper */
+.codelines{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 0;overflow-x:auto}
+.cl{padding:3px 16px;white-space:pre;color:var(--muted);border-left:3px solid transparent;transition:.2s}
+.cl.lit{background:var(--accent-ghost);border-left-color:var(--accent);color:var(--ink)}
+.cl .cm{color:var(--faint)}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--accent-ghost);border-radius:0 8px 8px 0;padding:12px 15px;margin:16px 0;max-width:var(--read);font-size:14px;color:var(--muted)}.note b{color:var(--accent)}
+/* 訓練/推論 模式徽章 */
+.mode{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;vertical-align:3px;margin-left:10px;white-space:nowrap}
+.mode.train{background:color-mix(in srgb,var(--cool) 16%,transparent);color:var(--cool);border:1px solid var(--cool)}
+.mode.infer{background:var(--accent-ghost);color:var(--accent);border:1px solid var(--accent)}
+/* io 卡 */
+.iocard{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin:12px 0 6px;overflow-x:auto;padding-bottom:2px}
+.iocard .io{display:flex;flex-direction:column;justify-content:center;text-align:center;padding:8px 12px;border-radius:8px;line-height:1.5;flex:none}
+.iocard .in,.iocard .out{border:1.5px dashed var(--line-strong);color:var(--muted);background:var(--surface)}
+.iocard .out{border-color:var(--accent-soft)}
+.iocard .box{border:1.5px solid var(--accent);background:var(--accent-ghost);color:var(--ink);font-weight:600}
+.iocard .box small{display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px}
+.iocard .ioarrow{align-self:center;color:var(--faint);flex:none}
+/* 往返動畫（文字→pad→模型→標籤） */
+.w2e{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;min-height:90px}
+.w2e .stg{opacity:.22;transition:opacity .45s,transform .45s;transform:translateY(5px);flex:none}
+.w2e .stg.lit{opacity:1;transform:none}
+.w2e .arrow{color:var(--faint);font-size:10.5px;text-align:center;line-height:1.5}
+.w2e .wordbig{font-size:13px;font-weight:700;color:var(--accent);border:1.5px solid var(--accent);border-radius:10px;padding:10px 14px;background:var(--accent-ghost);max-width:280px;white-space:normal;line-height:1.5}
+.w2e .idbig{font-size:12.5px;font-weight:600;border:1.5px solid var(--line-strong);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
+.decoded{font-family:var(--mono);font-size:13.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;min-height:44px}
+.decoded .nw{color:var(--accent);font-weight:700}
+.decoded .bad2{color:var(--bad);font-weight:700}
+.decoded .okw{color:var(--ham);font-weight:700}
+/* 機率長條 */
+.pbrow{display:grid;grid-template-columns:76px 1fr 150px;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;margin:5px 0;color:var(--muted)}
+.pbrow .barwrap{background:var(--surface-2);border-radius:3px;height:16px;overflow:hidden}
+.pbrow .bar{height:100%;background:var(--accent);opacity:.8;transition:width .25s}
+.pbrow.amx{color:var(--ink);font-weight:600}.pbrow.amx .bar{opacity:1}
+.pbrow.zero .bar{background:var(--line-strong)}
+.pbrow .cnum{font-variant-numeric:tabular-nums}
+/* 資料切分方塊（沿用 ch05 winrow 模式） */
+.winrow{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0;align-items:center}
+.win{width:24px;height:16px;border-radius:4px;background:var(--accent);opacity:.85;flex:none}
+.win.val{background:var(--cool)}
+.win.test{background:var(--ok)}
+.win.drop{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,var(--line) 4px,var(--line) 6px);border:1px dashed var(--line-strong);opacity:.9}
+.winleg{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px}
+.winleg i{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:5px}
+/* 平衡長條（本章新增：ham/spam 筆數） */
+.balrow{display:grid;grid-template-columns:64px 1fr 130px;align-items:center;gap:12px;font-family:var(--mono);font-size:12.5px;margin:10px 0;color:var(--muted)}
+.balrow .track{background:var(--surface-2);border-radius:4px;height:22px;overflow:hidden}
+.balrow .fill{height:100%;border-radius:4px;transition:width .8s cubic-bezier(.4,0,.2,1);opacity:.9}
+.balrow.hamr .fill{background:var(--ham)}.balrow.spamr .fill{background:var(--accent)}
+.balrow .cnum{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+/* 凍結堆疊（本章新增） */
+.stack{display:flex;flex-direction:column;gap:5px;font-family:var(--mono);font-size:12px;margin-top:10px}
+.layer{display:flex;align-items:center;gap:10px;padding:9px 13px;border-radius:7px;border:1px solid var(--line);background:var(--surface-2);transition:.25s;opacity:.55;cursor:pointer}
+.layer:hover{border-color:var(--line-strong)}
+.layer.train{opacity:1;border-color:var(--accent);background:var(--accent-ghost)}
+.layer .ico{width:18px;text-align:center;flex:none}.layer .nm{flex:1}
+.layer .st{font-size:10.5px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--faint);flex:none}
+.layer.train .st{border-color:var(--accent);color:var(--accent)}
+.bignum{font-family:var(--mono);font-size:clamp(22px,4.5vw,34px);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1;margin-top:10px}
+.bignum small{font-size:13px;color:var(--muted);margin-left:6px}
+/* quiz */
+.quiz .q{margin:18px 0}.quiz .qn{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:7px}.quiz .qt{font-weight:600;color:var(--ink);max-width:var(--read);margin-bottom:9px}
+.opt{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 14px;margin:6px 0;cursor:pointer;font-family:var(--sans);font-size:14px;color:var(--ink);max-width:var(--read)}
+.opt:hover{border-color:var(--accent)}.opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.opt .mk{float:right;font-family:var(--mono);font-weight:700}.opt.correct .mk{color:var(--ok)}.opt.wrong .mk{color:var(--bad)}
+.exp{max-width:var(--read);font-size:13px;color:var(--muted);padding:9px 14px;border-left:2px solid var(--accent);margin:5px 0 0;display:none}.exp.show{display:block}
+.foot{font-family:var(--mono);font-size:11px;color:var(--faint);padding:28px 0 70px;text-align:center;line-height:1.9}
+kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<header class="top"><div class="wrap">
+  <div class="brand"><span class="chip">CH·6</span><b><a href="index.html" style="color:inherit;text-decoration:none">從零打造 LLM</a></b><span style="color:var(--faint)">/ 分類任務微調</span></div>
+  <div class="spacer"></div><button class="tbtn" id="themeBtn">◐ 主題</button>
+</div></header>
+
+<div class="map">
+  <div class="wrap" id="mapRow"></div>
+  <div class="wrap"><div class="mapsub" id="mapSub"></div></div>
+</div>
+
+<div class="wrap"><div class="shell">
+  <nav class="toc" aria-label="章節導覽">
+    <div class="lbl">Chapter 6</div>
+    <a href="#sec-intro">本章定位 · 8 個步驟</a>
+    <a href="#sec-61">6.1 兩種微調路線</a>
+    <a href="#sec-62">6.2 準備資料集</a>
+    <a href="#sec-63">6.3 Data loaders</a>
+    <a href="#sec-64">6.4 載入預訓練權重</a>
+    <a href="#sec-65">6.5 分類頭與凍結</a>
+    <a href="#sec-66">6.6 分類 loss 與 accuracy</a>
+    <a href="#sec-67">6.7 微調 5 個 epoch</a>
+    <a href="#sec-68">6.8 上場當分類器</a>
+    <a href="#sec-sum">本章小結</a>
+    <a href="#sec-quiz">✓ 知識檢核</a>
+  </nav>
+
+  <main>
+    <div class="hero" id="top">
+      <p class="eyebrow">Build a Large Language Model (From Scratch) · Chapter 6</p>
+      <h1>分類任務微調<span class="sub">Fine-tuning for classification</span></h1>
+      <p class="lede">第 5 章結尾費心載入的 OpenAI GPT-2 權重，在這一章正式派上用場：把「會接話」的預訓練模型，改造成「會判斷」的<strong>垃圾簡訊分類器</strong>。做法出乎意料地省力——換一顆只有 2 個輸出的分類頭、凍結絕大多數參數、只微調最後幾層，5 個 epoch（筆電上 5.65 分鐘）就拿到 <strong>95.67%</strong> 的測試準確率。頁面中的關鍵數值都與書中執行輸出一致。</p>
+    </div>
+
+    <!-- ===== 本章定位 ===== -->
+    <section id="sec-intro" data-map="all">
+      <div class="sh"><span class="num">00</span><h2>本章定位：讓模型學會「做選擇題」</h2></div>
+      <p>整本書的三階段地圖裡，本章正式進入<strong>第三階段：微調</strong>——把第二階段練好（或載入）的 <span class="en">foundation model</span>，變成能解特定任務的專才：</p>
+      <div class="iocard">
+        <span class="io in">STAGE 1（ch2–4）<br>資料處理 · attention · 架構 ✓</span><span class="ioarrow">→</span>
+        <span class="io in">STAGE 2（ch5）<br>預訓練 · 載入 OpenAI 權重 ✓</span><span class="ioarrow">→</span>
+        <span class="io box">STAGE 3 開始！（本章）<br>分類微調 classification fine-tuning<small>ch7 則是另一條路：指令微調 instruction fine-tuning</small></span><span class="ioarrow">→</span>
+        <span class="io out">垃圾簡訊分類器<br>test accuracy 95.67%</span>
+      </div>
+      <p>本章的 8 個步驟——<strong>會隨你往下讀自動打勾</strong>（也可以點擊跳到該節）：</p>
+      <div class="bricks" id="bricks"></div>
+      <div class="plain"><div class="ph">🔰 先建立心態</div><p>微調不是重新教模型講話，而是<strong>借力</strong>：預訓練已經讓它讀懂文字（第 5 章花 69 萬美元等級的成果，我們免費載入），現在只要教它「讀完之後，在 spam / not spam 兩格裡打一個勾」。所以本章的所有改動都小得驚人：<b>換一顆 768→2 的輸出頭、解凍最後幾層、跑 5 個 epoch</b>——其餘 94% 的參數一動不動。</p></div>
+      <div class="plain"><div class="ph">🔰 複習：訓練 vs 推論（本頁會隨時標註）</div><p><span class="mode train">🏋️ 訓練 training</span>＝forward 算預測 → 算 loss → backward → <b>更新權重</b>——6.5–6.7 改造與微調模型屬於這邊；<span class="mode infer">💬 推論 inference</span>＝<b>權重固定</b>、只做 forward——6.8 拿微調好的模型判斷新簡訊屬於這邊。各節標題旁會掛上對應的標籤。</p></div>
+      <h3>暖身：本章的三個關鍵數字</h3>
+      <div class="stage"><div class="tsr"><span class="lbl"># 這三個數字本章都會親手算出來（書中真實輸出）</span>
+微調前 accuracy      <span style="color:var(--bad);font-weight:700">46.25% / 45.00% / 48.75%</span>   <span class="lbl"># train/val/test——2 類亂猜的水準（≈50%）</span>
+微調後 accuracy      <span style="color:var(--accent);font-weight:700">97.21% / 97.32% / 95.67%</span>   <span class="lbl"># 5 epochs、筆電 5.65 分鐘</span>
+可訓練參數           <span style="color:var(--cool);font-weight:700">7,090,946 / 124,441,346</span>     <span class="lbl"># 只動 5.7%：最後 1 個 block + final_norm + 新分類頭</span></div></div>
+    </section>
+
+    <!-- ===== 6.1 ===== -->
+    <section id="sec-61" data-map="all">
+      <div class="sh"><span class="num">6.1</span><h2>Different categories of fine-tuning（兩種微調路線）</h2></div>
+      <div class="iocard"><span class="io in">input：預訓練 foundation model<br>（只會「接下一個字」）</span><span class="ioarrow">→</span><span class="io box">選一條微調路線<small>classification（本章）或 instruction（第 7 章）</small></span><span class="ioarrow">→</span><span class="io out">output：專才分類器<br>或 通才助理</span></div>
+      <p>微調 LLM 最常見的兩條路：<span class="en">classification fine-tuning</span> 與 <span class="en">instruction fine-tuning</span>。<strong>點選切換</strong>，比較兩者的能力、資料需求與成本：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="ftSeg"><button data-m="0" class="on">Classification（本章）</button><button data-m="1">Instruction（第 7 章）</button></span></div>
+        <div class="tsr" id="ftTsr"></div>
+        <div class="stepcap" id="ftCap"></div>
+      </div>
+      <div class="note"><b>一句話區分：</b>分類微調後的模型是「單選題機器」——只能從<strong>訓練時見過的固定類別</strong>裡挑一個（spam / not spam），其他什麼都說不了；指令微調後的模型能理解任意指令並生成自由文字。專才比通才好練得多——這正是本章先做分類的原因。</div>
+    </section>
+
+    <!-- ===== 6.2 ===== -->
+    <section id="sec-62" data-map="s-data,s-bal">
+      <div class="sh"><span class="num">6.2</span><h2>Preparing the dataset（準備資料集）</h2></div>
+      <div class="iocard"><span class="io in">input：SMS Spam Collection<br>5,572 則簡訊（.tsv）</span><span class="ioarrow">→</span><span class="io box">undersample 平衡 → label 轉 0/1 → 切 70/10/20<small>random_state=123 · pandas DataFrame</small></span><span class="ioarrow">→</span><span class="io out">output：train.csv 1,045<br>validation.csv 149 · test.csv 300</span></div>
+      <p>資料用的是公開的 <span class="en">SMS Spam Collection</span>：5,572 則真實英文簡訊，每則標好 <code class="inl">"ham"</code>（正常）或 <code class="inl">"spam"</code>（垃圾）。用 <code class="inl">pd.read_csv</code> 載入後先看類別分佈——問題立刻浮現：</p>
+      <div class="stage">
+        <div class="controls"><span class="small">df["Label"].value_counts()　·　按按鈕執行 create_balanced_dataset(df)</span><span style="flex:1"></span><button class="btn" id="balBtn">執行 undersampling</button><button class="btn ghost" id="balReset">重置</button></div>
+        <div id="balBars"></div>
+        <div class="stepcap" id="balCap"></div>
+      </div>
+      <div class="plain"><div class="ph">🔰 為什麼一定要先平衡？</div><p>ham 有 4,825 則、spam 只有 747 則。直接拿去訓練，模型會發現一招懶人必勝法：<b>「全部猜 ham」就有 86.6% 準確率</b>——數字漂亮、實際上完全沒學到分辨能力。書中選最簡單的解法 <span class="en">undersampling</span>：從 ham 隨機抽 747 則（<code class="inl">random_state=123</code> 保證可重現），湊成 747 + 747 = 1,494 則的平衡資料集，此時亂猜的基準線就是誠實的 50%。</p></div>
+      <p>接著把字串標籤轉成整數——<code class="inl">"ham" → 0</code>、<code class="inl">"spam" → 1</code>。書中提醒：這和文字轉 token ID 是同一件事，只是「詞彙表」從 50,257 個字縮成 2 個類別：</p>
+      <pre>balanced_df["Label"] = balanced_df["Label"].map({<span class="k">"ham": 0, "spam": 1</span>})</pre>
+      <p>最後用 <code class="inl">random_split()</code> 把 1,494 則切成 <strong>70% / 10% / 20%</strong>（訓練 / 驗證 / 測試）。<strong>切換視角</strong>，看同一份資料的兩種數法（■ ≈ 10 則簡訊 / 1 個 batch）：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="spSeg"><button data-m="0" class="on">簡訊則數視角</button><button data-m="1">batch 視角（6.3 預告）</button></span></div>
+        <div class="winrow" id="spWins"></div>
+        <div class="winleg"><span><i style="background:var(--accent)"></i>train 70%</span><span><i style="background:var(--cool)"></i>validation 10%</span><span><i style="background:var(--ok)"></i>test 20%</span><span><i style="background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,var(--line) 4px,var(--line) 6px)"></i>不足一個 batch 被丟棄（drop_last=True）</span></div>
+        <div class="stepcap" id="spCap"></div>
+      </div>
+      <div class="note"><b>比第 5 章多了一份「測試集」？</b>第 5 章只切 train/val；這裡多切 20% 的 <b>test set</b>——val 用來在訓練過程中監控與調參，test 則<strong>只在最後動用一次</strong>，當作模型從沒見過的期末考。這也是 6.7 結尾 val 97.32% 略高於 test 95.67% 的原因：開發過程多少會「偏心」val。</div>
+    </section>
+
+    <!-- ===== 6.3 ===== -->
+    <section id="sec-63" data-map="s-bal,s-pad">
+      <div class="sh"><span class="num">6.3</span><h2>Creating data loaders（建立 data loaders）</h2></div>
+      <div class="iocard"><span class="io in">input：長短不一的簡訊<br>＋ 標籤 0/1</span><span class="ioarrow">→</span><span class="io box">SpamDataset：tokenize → pad 到 120<small>padding token = 50256（&lt;|endoftext|&gt;）</small></span><span class="ioarrow">→</span><span class="io out">output：batch [8, 120]<br>＋ label [8]</span></div>
+      <p>第 2 章的滑動視窗把長文切成<strong>等長</strong>片段；簡訊卻是天生<strong>長短不一</strong>的，要組成 batch 只有兩條路：<strong>全部截短成最短那則</strong>（省算力但丟資訊），或<strong>全部補長到最長那則</strong>（書中的選擇——保留完整內容）。補長用的填充物是老朋友 <code class="inl">&lt;|endoftext|&gt;</code>，它的 token ID 可以用 tiktoken 驗證：</p>
+      <pre>print(tokenizer.encode(<span class="k">"&lt;|endoftext|&gt;"</span>, allowed_special={"&lt;|endoftext|&gt;"}))
+<span class="c"># → [50256]</span></pre>
+      <p><strong>點選書中圖 6.6 的三則例句</strong>，看 tokenize → pad 的實際效果（灰色塊＝50256 填充）：</p>
+      <div class="stage">
+        <div class="controls" id="pdPills">
+          <button class="pill on" data-i="0">訊息 ①（6 tokens）</button>
+          <button class="pill" data-i="1">訊息 ②（5 tokens）</button>
+          <button class="pill" data-i="2">訊息 ③（11 tokens，最長）</button>
+        </div>
+        <div class="tsr" id="pdTsr"></div>
+        <div class="stepcap" id="pdCap"></div>
+      </div>
+      <p><code class="inl">SpamDataset</code> 類別把這套流程包起來：找出<strong>訓練集最長的序列＝120 tokens</strong>，全部 pad 到 120；驗證／測試集也 pad 到同樣的 120，超過的用 <code class="inl">encoded_text[:max_length]</code> 截斷。之後照舊交給 <code class="inl">DataLoader</code>（batch_size=8、train 開 shuffle 與 drop_last）：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># 書中真實輸出（seed 123）</span>
+print(train_dataset.max_length)  <span class="pn">→</span>  <span style="color:var(--accent);font-weight:700">120</span>   <span class="lbl"># 訓練集最長簡訊的 token 數（模型上限是 1024，綽綽有餘）</span>
+
+Input batch dimensions: torch.Size([<span style="color:var(--accent);font-weight:700">8, 120</span>])   <span class="lbl"># 8 則簡訊 × 各 120 個 token ID</span>
+Label batch dimensions  torch.Size([<span style="color:var(--accent);font-weight:700">8</span>])        <span class="lbl"># 8 個 0/1 標籤——不再是「右移一格的 token」！</span>
+
+130 training batches     <span class="lbl"># 1,045 則 ÷ 8，drop_last=True → 130 個滿 batch（丟 5 則）</span>
+19 validation batches    <span class="lbl"># 149 則 ÷ 8，最後一個 batch 只有 5 則</span>
+38 test batches          <span class="lbl"># 300 則 ÷ 8，最後一個 batch 只有 4 則</span></div></div>
+      <div class="note"><b>和第 2 章 data loader 的最大差別</b>在 target：預訓練的 target 是「整句右移一格」（形狀 [8, 120]），分類的 target 是<strong>每則一個類別標籤</strong>（形狀 [8]）。輸入端長得一模一樣，監督訊號完全不同——這就是「自監督 → 監督式」的轉換。</div>
+    </section>
+
+    <!-- ===== 6.4 ===== -->
+    <section id="sec-64" data-map="s-gpt">
+      <div class="sh"><span class="num">6.4</span><h2>Initializing a model with pretrained weights（載入預訓練權重）</h2></div>
+      <div class="iocard"><span class="io in">input：OpenAI GPT-2 124M 權重<br>（第 5 章的 download_and_load_gpt2）</span><span class="ioarrow">→</span><span class="io box">GPTModel(BASE_CONFIG) + load_weights_into_gpt<small>第 5 章寫好的工具直接重用</small></span><span class="ioarrow">→</span><span class="io out">output：會講人話的 GPT-2<br>（但還不會「聽指令」）</span></div>
+      <p>資料備妥，換模型登場。config 和第 5 章 5.5 節收尾時完全一致——<strong>點任一行看說明：</strong></p>
+      <div class="stage">
+        <div class="codelines" id="cfgLines"></div>
+        <div class="stepcap" id="cfgCap">👆 點一行 config，看它的意思（注意 drop_rate 與 qkv_bias）</div>
+      </div>
+      <p>載入權重後先做個小體檢——用第 4、5 章的生成工具確認權重沒搬壞：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># generate_text_simple(model, "Every effort moves you", max_new_tokens=15)——書中真實輸出</span>
+Every effort moves you <span style="color:var(--accent);font-weight:700">forward.
+The first step is to understand the importance of your work</span>   <span class="lbl"># ✓ 通順＝權重載入成功</span></div></div>
+      <h3>先別急著微調：直接「用問的」行不行？</h3>
+      <p>微調前先做一個對照實驗：把分類任務<strong>寫成指令</strong>塞給模型，看它能不能直接回答。<strong>點選兩種輸入對照：</strong></p>
+      <div class="stage">
+        <div class="controls" id="pfPills">
+          <button class="pill on" data-i="0">輸入 A：一般接話</button>
+          <button class="pill" data-i="1">輸入 B：用指令問「這是 spam 嗎？」</button>
+        </div>
+        <div class="tsr" id="pfTsr"></div>
+        <div class="stepcap" id="pfCap"></div>
+      </div>
+      <div class="note"><b>失敗在意料之中</b>——這個模型只做過預訓練（接下一個字），沒做過 instruction fine-tuning，所以它把指令當成「待接龍的文字」原樣複讀。兩條出路：①第 7 章的指令微調，讓它學會聽懂指令；②本章的做法——<strong>根本不靠它「回答」，直接在模型上接一顆分類頭讀出答案</strong>。後者簡單得多。</div>
+    </section>
+
+    <!-- ===== 6.5 ===== -->
+    <section id="sec-65" data-map="s-gpt,s-head">
+      <div class="sh"><span class="num">6.5</span><h2>Adding a classification head（加上分類頭）<span class="mode train">🏋️ 訓練</span></h2></div>
+      <div class="iocard"><span class="io in">input：GPTModel<br>out_head：768 → 50257</span><span class="ioarrow">→</span><span class="io box">凍結全部 → 換 out_head：768 → 2 → 解凍最後 1 個 block + final_norm<small>requires_grad 控制哪些參數會被更新</small></span><span class="ioarrow">→</span><span class="io out">output：分類版 GPT<br>可訓練參數只剩 5.7%</span></div>
+      <p>改造只有三行邏輯：<strong>①全部凍結</strong>（<code class="inl">requires_grad=False</code>——backward 不會算它們的梯度、optimizer 不會動它們）；<strong>②換頭</strong>——把 768→50257 的 <code class="inl">out_head</code> 換成 768→2 的新 <code class="inl">Linear</code>（新層預設 <code class="inl">requires_grad=True</code>）；<strong>③選擇性解凍</strong>——書中實驗發現多放開幾層效果更好，於是把<strong>最後一個 transformer block 和 final LayerNorm</strong> 也設回可訓練：</p>
+      <pre>for param in model.parameters():
+    param.requires_grad = <span class="k">False</span>                 <span class="c"># ① 全部凍結</span>
+
+torch.manual_seed(123)
+model.out_head = torch.nn.Linear(               <span class="c"># ② 換頭：768 → 2（新層自動可訓練）</span>
+    in_features=BASE_CONFIG["emb_dim"], out_features=<span class="k">2</span>)
+
+for param in model.trf_blocks[<span class="k">-1</span>].parameters():
+    param.requires_grad = <span class="k">True</span>                  <span class="c"># ③ 解凍最後一個 block</span>
+for param in model.final_norm.parameters():
+    param.requires_grad = <span class="k">True</span>                  <span class="c">#    與 final LayerNorm</span></pre>
+      <p><strong>切換三種凍結策略、再點任一層</strong>，看誰是 trainable（亮色＝requires_grad=True）：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="stSeg"><button data-s="0">A · 只訓練分類頭</button><button data-s="1" class="on">B · +最後 block+final_norm（書中做法）</button><button data-s="2">C · 全部解凍</button></span></div>
+        <div class="stack" id="stStack"></div>
+        <div class="bignum"><span id="stNum"></span><small id="stPct"></small></div>
+        <div class="stepcap" id="stCap"></div>
+      </div>
+      <h3>關鍵問題：模型輸出 [1, 4, 2]，該用哪一格？</h3>
+      <p>換頭後餵一句 <code class="inl">"Do you have time"</code>（4 個 token），輸出從 [1, 4, 50257] 變成 <strong>[1, 4, 2]</strong>——每個 token 位置都有一組 2 維 logits，但分類只需要<strong>一個</strong>答案。<strong>點下面任一個 token</strong>，看它的「視野」（書中圖 6.12 的真實 attention 權重）與它那格的真實 logits：</p>
+      <div class="stage">
+        <div class="sent" id="ltChips"></div>
+        <div class="tsr" id="ltTsr"></div>
+        <div class="stepcap" id="ltCap"></div>
+      </div>
+      <div class="plain"><div class="ph">🔰 為什麼是「最後一個 token」？（第 3 章伏筆回收）</div><p>第 3 章的 <span class="en">causal mask</span> 規定：每個 token 只能注意<b>自己和前面</b>的字。所以位置 1 只讀過一個字、位置 2 讀過兩個……<b>只有最後一個 token 的 attention 覆蓋整句</b>，它是唯一「把全文讀完」的位置。拿它的輸出接分類頭，等於請讀完全文的人來作答——這就是程式裡 <code class="inl">outputs[:, -1, :]</code> 的由來。</p></div>
+    </section>
+
+    <!-- ===== 6.6 ===== -->
+    <section id="sec-66" data-map="s-head,s-use">
+      <div class="sh"><span class="num">6.6</span><h2>Calculating the classification loss and accuracy（分類 loss 與 accuracy）<span class="mode train">🏋️ 訓練</span></h2></div>
+      <div class="iocard"><span class="io in">input：最後一格 logits<br>[batch, 2]</span><span class="ioarrow">→</span><span class="io box">softmax → argmax（accuracy）<br>cross entropy（loss）<small>第 5 章的老公式，50257 類 → 2 類</small></span><span class="ioarrow">→</span><span class="io out">output：微調前基準線<br>accuracy ≈ 46–49%</span></div>
+      <p>怎麼把 2 維 logits 變成「spam / not spam」的判斷？和第 5 章預測下一個字<strong>一模一樣</strong>：softmax 轉機率、argmax 挑最大——只是候選從 50,257 個縮成 2 個。<strong>點選書中圖 6.14 的兩個例子</strong>，看還沒微調的模型怎麼答：</p>
+      <div class="stage">
+        <div class="controls" id="smPills">
+          <button class="pill on" data-i="0">"You won the lottery"</button>
+          <button class="pill" data-i="1">"Do you have time"</button>
+        </div>
+        <div class="tsr" id="smTsr"></div>
+        <div class="stepcap" id="smCap"></div>
+      </div>
+      <div class="plain"><div class="ph">🔰 loss 也是第 5 章的老朋友（5.1.2 伏筆回收）</div><p>accuracy（答對比例）人類看得懂，卻是<b>不可微分</b>的階梯函數——沒有梯度、沒法 backward。所以訓練時照舊用 <span class="en">cross entropy</span> 當代理目標：5.1.2 推導的六步（softmax → 取正確類別機率 → log → 平均 → 取負）<b>一個字都不用改</b>，只是「正確答案」從 5 萬字裡的一個 token，變成 0/1 兩類裡的一類。loss 降，accuracy 自然升。</p></div>
+      <pre>def calc_loss_batch(input_batch, target_batch, model, device):
+    input_batch  = input_batch.to(device)
+    target_batch = target_batch.to(device)
+    logits = model(input_batch)<span class="k">[:, -1, :]</span>        <span class="c"># 唯一的改動：只取最後一個 token 那格</span>
+    return torch.nn.functional.cross_entropy(logits, target_batch)</pre>
+      <p>微調前先量基準線（<code class="inl">torch.no_grad()</code>，各抽 10／5 個 batch 估計）：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># 書中真實輸出（微調前，seed 123）</span>
+Training accuracy:   <span style="color:var(--bad);font-weight:700">46.25%</span>     Training loss:   <span style="color:var(--bad);font-weight:700">2.453</span>
+Validation accuracy: <span style="color:var(--bad);font-weight:700">45.00%</span>     Validation loss: <span style="color:var(--bad);font-weight:700">2.583</span>
+Test accuracy:       <span style="color:var(--bad);font-weight:700">48.75%</span>     Test loss:       <span style="color:var(--bad);font-weight:700">2.322</span>
+
+<span class="lbl"># 2 類亂猜的期望值是 50%——新分類頭是隨機初始化的，表現在亂猜水準完全合理。
+# 訓練的任務：把 loss 壓下去，讓 accuracy 衝上去。</span></div></div>
+    </section>
+
+    <!-- ===== 6.7 ===== -->
+    <section id="sec-67" data-map="s-ft">
+      <div class="sh"><span class="num">6.7</span><h2>Fine-tuning the model on supervised data（在監督資料上微調）<span class="mode train">🏋️ 訓練</span></h2></div>
+      <div class="iocard"><span class="io in">input：130 個 train batch<br>＋ 只有 5.7% 可訓練的模型</span><span class="ioarrow">→</span><span class="io box">train_classifier_simple × 5 epochs<small>AdamW（lr=5e-5, weight_decay=0.1）· eval_freq=50</small></span><span class="ioarrow">→</span><span class="io out">output：97%+ 的分類器<br>（M3 MacBook Air 5.65 分鐘）</span></div>
+      <p>訓練迴圈幾乎照抄第 5 章的 <code class="inl">train_model_simple</code>：取 batch → forward 算 loss → backward → AdamW 更新，只差兩處——<strong>記帳單位</strong>從 tokens_seen 換成 examples_seen（看過幾則簡訊），<strong>每個 epoch 結尾</strong>從「生成樣本肉眼檢查」換成「算一次 train/val accuracy」：</p>
+      <pre>torch.manual_seed(123)
+optimizer = torch.optim.AdamW(model.parameters(), lr=<span class="k">5e-5</span>, weight_decay=<span class="k">0.1</span>)
+num_epochs = <span class="k">5</span>   <span class="c"># optimizer 收到全部參數也沒關係——凍結的參數沒有梯度，永遠不會被動到</span></pre>
+      <p><strong>按「下一個 epoch」逐輪觀察</strong>：上圖 loss、下圖 accuracy（<strong>所有資料點都是書中列印的真實數值，無內插</strong>），右側主控台同步輸出書中的訓練紀錄：</p>
+      <div class="stage">
+        <div class="controls">
+          <button class="btn ghost" id="epPrev">← 上一個</button>
+          <button class="btn" id="epNext">下一個 epoch →</button>
+          <button class="btn ghost" id="epAll">跑完 5 輪</button>
+          <button class="btn ghost" id="epReset">重置</button>
+          <span class="dots" id="epDots"></span>
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px"><canvas id="trCv" width="860" height="400"></canvas></div>
+        <div class="tsr" id="epConsole" style="margin-top:12px;max-height:150px;overflow-y:auto"></div>
+        <div class="stepcap" id="epCap"></div>
+      </div>
+      <p>訓練完，用<strong>完整資料集</strong>（不再抽樣）算最終成績：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># 書中真實輸出（full dataset）</span>
+Training accuracy:   <span style="color:var(--accent);font-weight:700">97.21%</span>
+Validation accuracy: <span style="color:var(--accent);font-weight:700">97.32%</span>
+Test accuracy:       <span style="color:var(--accent);font-weight:700">95.67%</span>   <span class="lbl"># ← 最誠實的數字：完全沒參與訓練與調參的期末考</span></div></div>
+      <div class="note"><b>和第 5 章的訓練曲線對照著看：</b>第 5 章 train/val 曲線嚴重分岔（train 0.39 vs val 6.45，教科書級 overfitting）；本章兩條線<b>幾乎貼著走</b>。原因有三：①資料是 1,045 則各自不同的簡訊而不是反覆背 5,145 個 token；②只跑 5 個 epoch；③ 94% 的參數被凍結，模型想背也背不動。val 97.32% 略高於 test 95.67% 屬正常現象——開發過程對 val 略有「應試偏心」。</div>
+    </section>
+
+    <!-- ===== 6.8 ===== -->
+    <section id="sec-68" data-map="s-use">
+      <div class="sh"><span class="num">6.8</span><h2>Using the LLM as a spam classifier（上場當分類器）<span class="mode infer">💬 推論</span></h2></div>
+      <div class="iocard"><span class="io in">input：任何一則新簡訊</span><span class="ioarrow">→</span><span class="io box">classify_review<small>tokenize → 截斷 → pad 到 120 → 最後一格 logits → argmax</small></span><span class="ioarrow">→</span><span class="io out">output："spam" 或 "not spam"</span></div>
+      <p>最後把整條流程包成 <code class="inl">classify_review()</code>——它做的每一步都和訓練時的 <code class="inl">SpamDataset</code> 一致（同樣的 tokenizer、同樣 pad 到 120），差別只在最後把 0/1 翻譯回人話。<strong>選一則書中的真實例句、按播放：</strong></p>
+      <div class="stage">
+        <div class="controls" id="cvPills">
+          <button class="pill on" data-i="0">例句 ①「You are a winner…」</button>
+          <button class="pill" data-i="1">例句 ②「Hey, just wanted to check…」</button>
+          <span style="flex:1"></span><button class="btn" id="cvPlay">▶ 播放</button>
+        </div>
+        <div class="w2e" id="cv">
+          <div class="stg" data-s="0"><div class="wordbig" id="cvText"></div></div>
+          <div class="stg arrow" data-s="1">tokenize<br>→ 截斷 → pad(50256)<br>→</div>
+          <div class="stg" data-s="1"><div class="idbig">tensor [1, 120]<br><span class="small">unsqueeze(0) 補 batch 維</span></div></div>
+          <div class="stg arrow" data-s="2">GPT（凍結）<br>＋分類頭 768→2<br>→</div>
+          <div class="stg" data-s="2"><div class="idbig" style="border-color:var(--accent)">logits[:, -1, :]<br><span class="small">最後一格 · 形狀 [1, 2]</span></div></div>
+          <div class="stg arrow" data-s="3">argmax<br>→</div>
+        </div>
+        <div class="decoded" id="cvOut" style="opacity:.25;transition:opacity .4s"></div>
+        <div class="stepcap" id="cvCap">👆 按「播放」跑一遍：簡訊 → token → 模型 → 標籤</div>
+      </div>
+      <p>收工前把成果存檔（第 5 章教的 <code class="inl">state_dict</code>），下次直接載入、不用重練：</p>
+      <pre>torch.save(model.state_dict(), <span class="k">"review_classifier.pth"</span>)
+<span class="c"># 之後：</span>
+model_state_dict = torch.load("review_classifier.pth", map_location=device)
+model.load_state_dict(model_state_dict)</pre>
+      <div class="note"><b>下一站：</b>這個分類器很能幹，但它永遠只會答這一題。第 7 章走另一條路——<b>instruction fine-tuning</b>：不換頭、保留 50,257 維的生成能力，改用「指令＋回應」的資料教模型聽懂人話，變成什麼都能聊的助理。</div>
+    </section>
+
+    <!-- ===== 小結 ===== -->
+    <section id="sec-sum" data-map="all">
+      <div class="sh"><span class="num">▣</span><h2>本章小結</h2></div>
+      <ul class="clean">
+        <li><b>兩種微調</b>：classification（固定類別、省資料省算力、專才）vs instruction（任意指令、需大量資料、通才）——本章走前者。</li>
+        <li><b>資料</b>：SMS Spam Collection 5,572 則 → undersample 平衡成 747+747 → label ham=0/spam=1 → 切 70/10/20（1,045/149/300）。</li>
+        <li><b>Data loader</b>：pad 到訓練集最長的 120 tokens（填 50256）、超長截斷；batch 形狀 [8, 120]＋標籤 [8]；130/19/38 個 batch。</li>
+        <li><b>模型改造</b>：載入第 5 章的 GPT-2 124M 權重 → 全部凍結 → out_head 換成 768→2 → 解凍最後一個 block＋final_norm（可訓練 7,090,946 ≈ 5.7%）。</li>
+        <li><b>取最後一個 token</b>：causal mask 下只有最後一格讀過整句 → <code class="inl">logits = model(x)[:, -1, :]</code>。</li>
+        <li><b>Loss / accuracy</b>：cross entropy 與第 5 章同一條公式（50257 類 → 2 類）；accuracy 不可微，只當監控指標。微調前 46–49%（≈亂猜）。</li>
+        <li><b>微調實測</b>：AdamW（lr=5e-5, weight_decay=0.1）× 5 epochs、5.65 分鐘 → train 97.21% / val 97.32% / test 95.67%，train/val 曲線貼合、無明顯 overfitting。</li>
+        <li><b>實際使用</b>：classify_review() 完整重演訓練時的前處理；兩則書中例句分別判為 "spam" 與 "not spam"，全對。</li>
+      </ul>
+    </section>
+
+    <section id="sec-quiz" data-map="all">
+      <div class="sh"><span class="num">✓</span><h2>知識檢核</h2></div>
+      <p class="small" style="margin-bottom:14px">// 七題，作答後立即看解析</p>
+      <div class="quiz" id="quizBox"></div>
+      <div id="score" style="font-family:var(--mono);font-size:14px;color:var(--accent);margin-top:16px"></div>
+    </section>
+
+    <div class="foot">從零打造 LLM · 第 6 章互動教材 ｜ 講解為原創文字，程式碼與數值對應 Sebastian Raschka《Build a Large Language Model (From Scratch)》Ch.6 的公開程式與執行輸出，非原文翻譯<br>頁面中的計算皆為瀏覽器即時運算　·　快捷鍵 <kbd>T</kbd> 切換主題</div>
+  </main>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const root=document.documentElement;
+const css=v=>getComputedStyle(root).getPropertyValue(v).trim();
+$("#themeBtn").addEventListener("click",()=>{const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",cur==="dark"?"light":"dark");});
+addEventListener("keydown",e=>{if(e.target.matches&&e.target.matches("input,textarea"))return;if(e.key==="t"||e.key==="T")$("#themeBtn").click();});
+const reduced=matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+/* ===== 全域分類微調管線圖 ===== */
+const STAGES=[
+ {id:"s-data",em:"📨",label:"簡訊資料"},{id:"s-bal",em:"⚖️",label:"平衡/切分"},{id:"s-pad",em:"✂️",label:"Tokenize+Pad"},
+ {id:"s-gpt",em:"🧊",label:"GPT（凍結）"},{id:"s-head",em:"🎯",label:"分類頭 768→2"},{id:"s-ft",em:"🏋️",label:"微調"},
+ {id:"s-use",em:"✅",label:"評估/使用"}];
+$("#mapRow").innerHTML=STAGES.map((s,i)=>`<div class="mapstage" data-id="${s.id}"><span class="em">${s.em}</span>${s.label}</div>`+(i<STAGES.length-1?'<span class="mapsep">›</span>':'')).join("");
+$$(".mapstage").forEach(el=>el.addEventListener("click",()=>{const sec=[...$$("section")].find(s=>{const m=s.dataset.map||"";return m!=="all"&&m.split(",").includes(el.dataset.id);});if(sec){sec.scrollIntoView();}else{document.getElementById("sec-67").scrollIntoView();}}));
+function setMap(sec){
+  const raw=(sec&&sec.dataset.map)||"all";
+  const ids=raw==="all"?STAGES.map(s=>s.id):raw.split(",");
+  $$(".mapstage").forEach(el=>el.classList.toggle("lit",ids.includes(el.dataset.id)));
+  if(raw==="all"){$("#mapSub").innerHTML=`分類微調管線：簡訊 → 平衡/切分 → tokenize+pad → 凍結的 GPT → 分類頭 → 微調 → 上場判斷`;}
+  else{const lbls=ids.map(id=>STAGES.find(s=>s.id===id).label);$("#mapSub").innerHTML=`目前在：<b>${lbls.join(" · ")}</b>`;}
+}
+
+/* ===== 積木進度（8 步驟）===== */
+const BRICKS=[["1","兩種微調路線","sec-61"],["2","平衡資料集","sec-62"],["3","data loaders","sec-63"],["4","預訓練權重","sec-64"],["5","換頭＋凍結","sec-65"],["6","loss/accuracy","sec-66"],["7","微調 5 epochs","sec-67"],["8","上場分類","sec-68"]];
+$("#bricks").innerHTML=BRICKS.map(b=>`<div class="brick" data-sec="${b[2]}"><span class="ck"></span><span><b>${b[0]}</b> ${b[1]}</span></div>`).join("");
+$$(".brick").forEach(el=>el.addEventListener("click",()=>document.getElementById(el.dataset.sec).scrollIntoView()));
+const SEC_ORDER=["sec-intro","sec-61","sec-62","sec-63","sec-64","sec-65","sec-66","sec-67","sec-68","sec-sum","sec-quiz"];
+function setBricks(curId){
+  const cur=SEC_ORDER.indexOf(curId);
+  $$(".brick").forEach(el=>{
+    const bi=SEC_ORDER.indexOf(el.dataset.sec);
+    el.classList.toggle("done",cur>bi);
+    el.classList.toggle("now",el.dataset.sec===curId);
+    el.querySelector(".ck").textContent=el.classList.contains("done")?"✓":"";
+  });
+}
+
+/* nav + prog + map + bricks */
+const secs=$$("section, .hero"),links=$$("nav.toc a");
+function onScroll(){
+  const h=document.documentElement;$("#prog").style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+"%";
+  let cur=secs[0];for(const s of secs)if(s.getBoundingClientRect().top<=150)cur=s;
+  links.forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+cur.id));
+  setMap(cur.tagName==="SECTION"?cur:null);
+  setBricks(cur.id);
+}
+addEventListener("scroll",onScroll,{passive:true});onScroll();
+
+/* ===== 6.1 兩種微調對照 ===== */
+const FT=[
+[`<span class="lbl"># Classification fine-tuning —— 本章</span>
+輸入    一段文字（不附任何指令）
+輸出    固定類別中的一個：<span style="color:var(--accent);font-weight:700">spam</span> / <span style="color:var(--ham);font-weight:700">not spam</span>
+資料    少量標註即可——本章只用 <span style="color:var(--accent);font-weight:700">1,494</span> 則
+算力    小：凍結大部分參數，筆電 5.65 分鐘
+角色    專才——這一題答很準，其他一概不會`,
+ `例：丟進 "You are a winner you have been specially selected..."（什麼說明都不用加）→ 模型只回 <b>"spam"</b>。開發成本低、行為可控、可靠——適合情感分析、垃圾偵測這類「預先定義好類別」的任務。`],
+[`<span class="lbl"># Instruction fine-tuning —— 第 7 章</span>
+輸入    任意指令＋內容（"Translate into German: ..."）
+輸出    自由生成的文字回應
+資料    需要大量「指令＋示範回應」配對
+算力    大——通才需要更多資料與運算才練得好
+角色    通才——翻譯、摘要、問答都能接`,
+ `例：丟進 "Translate into German: 'The quick brown fox jumps over the lazy dog.'" → 模型生成 <b>"Der schnelle braune Fuchs springt über den faulen Hund."</b>。彈性大，但資料與算力需求高出一個量級。`]];
+function renderFT(m){
+  $$("#ftSeg button").forEach(b=>b.classList.toggle("on",+b.dataset.m===m));
+  $("#ftTsr").innerHTML=FT[m][0];$("#ftCap").innerHTML=FT[m][1];
+}
+$$("#ftSeg button").forEach(b=>b.addEventListener("click",()=>renderFT(+b.dataset.m)));
+renderFT(0);
+
+/* ===== 6.2 平衡資料集 ===== */
+let balanced=false;
+function renderBal(){
+  const ham=balanced?747:4825;
+  const w=n=>(n/4825*100).toFixed(1)+"%";
+  $("#balBars").innerHTML=
+   `<div class="balrow hamr"><span>ham</span><div class="track"><div class="fill" style="width:${w(ham)}"></div></div><span class="cnum">${ham.toLocaleString("en-US")} 則${balanced?"（抽樣後）":""}</span></div>`+
+   `<div class="balrow spamr"><span>spam</span><div class="track"><div class="fill" style="width:${w(747)}"></div></div><span class="cnum">747 則</span></div>`;
+  $("#balCap").innerHTML=balanced
+   ?`<b>平衡後</b>：747 + 747 ＝ 1,494 則（ham 用 <b>random_state=123</b> 隨機抽 747 則，保證可重現）。現在「全猜同一類」只剩 50%——模型被迫學真本事。`
+   :`<b>原始分佈</b>：ham 4,825 / spam 747，嚴重不平衡——「全部猜 ham」就有 4,825 ÷ 5,572 ≈ <b>86.6%</b> 的假準確率。按上方按鈕執行 undersampling。`;
+}
+$("#balBtn").addEventListener("click",()=>{balanced=true;renderBal();});
+$("#balReset").addEventListener("click",()=>{balanced=false;renderBal();});
+renderBal();
+
+/* ===== 6.2 70/10/20 切分 ===== */
+let spMode=0;
+function renderSP(){
+  $$("#spSeg button").forEach(b=>b.classList.toggle("on",+b.dataset.m===spMode));
+  let h="";
+  if(spMode===0){
+    for(let i=0;i<104;i++)h+=`<span class="win" title="train ≈10 則"></span>`;
+    h+=`<span class="small" style="margin:0 4px">│</span>`;
+    for(let i=0;i<15;i++)h+=`<span class="win val" title="validation ≈10 則"></span>`;
+    h+=`<span class="small" style="margin:0 4px">│</span>`;
+    for(let i=0;i<30;i++)h+=`<span class="win test" title="test ≈10 則"></span>`;
+    $("#spCap").innerHTML=`random_split(balanced_df, 0.7, 0.1) → <b>train 1,045 則（70%）· validation 149 則（10%）· test 300 則（20%）</b>，共 1,494。切分前先整份 shuffle（random_state=123），避免 spam 集中在某一段。每格 ≈ 10 則。`;
+  }else{
+    for(let i=0;i<130;i++)h+=`<span class="win" title="train batch [8, 120]"></span>`;
+    h+=`<span class="win drop" title="湊不滿 8 則的 5 則被 drop_last 丟棄"></span>`;
+    h+=`<span class="small" style="margin:0 4px">│</span>`;
+    for(let i=0;i<19;i++)h+=`<span class="win val" title="val batch"></span>`;
+    h+=`<span class="small" style="margin:0 4px">│</span>`;
+    for(let i=0;i<38;i++)h+=`<span class="win test" title="test batch"></span>`;
+    $("#spCap").innerHTML=`batch_size=8 → <b>130 個 train batch</b>（drop_last=True，1,045 的尾巴 5 則被丟棄）· <b>19 個 val batch</b>（最後一個只有 5 則）· <b>38 個 test batch</b>（最後一個只有 4 則）——與書中輸出 130 / 19 / 38 一致。每格 = 1 個 batch。`;
+  }
+  $("#spWins").innerHTML=h;
+}
+$$("#spSeg button").forEach(b=>b.addEventListener("click",()=>{spMode=+b.dataset.m;renderSP();}));
+renderSP();
+
+/* ===== 6.3 padding 探索（圖 6.6 真實 token）===== */
+const PD=[
+ {t:"This is the first text message",ids:[1212,318,262,717,2420,3275]},
+ {t:"This is another text message",ids:[1212,318,1194,2420,3275]},
+ {t:"This is the third text message, which is very long",ids:[1212,318,262,2368,2420,3275,11,543,318,845,890]}];
+const PD_MAX=11;
+function renderPD(i){
+  $$("#pdPills .pill").forEach(b=>b.classList.toggle("on",+b.dataset.i===i));
+  const m=PD[i],npad=PD_MAX-m.ids.length;
+  const tok=m.ids.map(v=>`<span style="color:var(--ink)">${v}</span>`).join('<span class="pn">, </span>');
+  const pads=Array.from({length:npad},()=>`<span style="color:var(--faint);background:var(--surface);border:1px dashed var(--line-strong);border-radius:4px;padding:0 3px">50256</span>`).join('<span class="pn">, </span>');
+  $("#pdTsr").innerHTML=`<span class="lbl"># 原文</span>
+"${m.t}"
+
+<span class="lbl"># ① tokenize（GPT-2 BPE）→ ${m.ids.length} 個 token</span>
+[${tok}]
+
+<span class="lbl"># ② pad 到這批最長的 ${PD_MAX} 個（訊息 ③）——虛線灰塊＝&lt;|endoftext|&gt;</span>
+[${tok}${npad?'<span class="pn">, </span>'+pads:''}]   <span class="lbl">→ 長度 ${PD_MAX} ✓</span>`;
+  $("#pdCap").innerHTML=i===2
+   ?`<b>訊息 ③ 是這批最長的（11 tokens）</b>——一個都不用補，其他訊息全都以它為基準。真實訓練集同理：最長的一則有 <b>120</b> tokens，於是全部 1,045 則都 pad 到 120。`
+   :`訊息 ${i+1}：${m.ids.length} 個 token → 補上 <b>${npad} 個 50256</b> 到 ${PD_MAX}。選「截短」會把長訊息砍掉關鍵內容（spam 的尾巴常常才是破綻），所以書中選擇 pad。`;
+}
+$$("#pdPills .pill").forEach(b=>b.addEventListener("click",()=>renderPD(+b.dataset.i)));
+renderPD(0);
+
+/* ===== 6.4 config explorer ===== */
+const CFG=[
+ ['CHOOSE_MODEL = "gpt2-small (124M)"','四種尺寸任選；書中用最小的 124M——第 5 章載入過的老朋友。想要更高準確率可以換大模型，載入方式一個字都不用改。'],
+ ['BASE_CONFIG = {',null],
+ ['    "vocab_size": 50257,','詞彙表不變——輸入端仍是同一個 GPT-2 BPE tokenizer。'],
+ ['    "context_length": 1024,','GPT-2 原生的上下文長度（第 5 章 5.5 已調回）。簡訊 pad 到 120，離上限很遠。'],
+ ['    "drop_rate": 0.0,','關閉 dropout。預訓練時用 0.1 防背誦；微調書中直接設 0.0——資料每則都不同、又只跑 5 輪，不太需要它。'],
+ ['    "qkv_bias": True','第 5 章的伏筆延續：OpenAI 的 GPT-2 權重有 Q/K/V bias，要用人家的權重就得跟人家的設定一致。'],
+ ['}',null]];
+$("#cfgLines").innerHTML=CFG.map((c,i)=>`<div class="cl" data-i="${i}" style="cursor:${c[1]?'pointer':'default'}">${c[0]}</div>`).join("");
+$$("#cfgLines .cl").forEach(el=>el.addEventListener("click",()=>{
+  const c=CFG[+el.dataset.i];if(!c[1])return;
+  $$("#cfgLines .cl").forEach(x=>x.classList.remove("lit"));el.classList.add("lit");
+  $("#cfgCap").innerHTML="<b>"+c[0].trim().replace(/,$/,"")+"</b> — "+c[1];
+}));
+
+/* ===== 6.4 微調前直接問會失敗 ===== */
+const PF=[
+[`<span class="lbl"># 輸入 A：普通接話（模型的本行）——書中真實輸出</span>
+text_1 = "Every effort moves you"
+
+→ Every effort moves you <span style="color:var(--accent);font-weight:700">forward.
+  The first step is to understand the importance of your work</span>   <span class="lbl"># ✓ 通順</span>`,
+ `這是預訓練模型的舒適圈：給一段開頭、往下接。語言能力完全正常——問題不在「懂不懂英文」。`],
+[`<span class="lbl"># 輸入 B：把分類任務寫成指令——書中真實輸出</span>
+text_2 = "Is the following text 'spam'? Answer with 'yes' or 'no':
+ 'You are a winner you have been specially selected
+  to receive $1000 cash or a $2000 award.'"
+
+→ Is the following text 'spam'? Answer with 'yes' or 'no': 'You are a winner
+  you have been specially selected to receive $1000 cash
+  or a $2000 award.'
+  <span style="color:var(--bad);font-weight:700">The following text 'spam'? Answer with 'yes' or 'no': 'You are a winner</span>   <span class="lbl"># ✗ 原樣複讀</span>`,
+ `模型完全沒回答 yes/no，只是把整段指令<b>當成待接龍的文字複讀</b>——它只學過「接下一個字」，從沒學過「聽指令行事」。這正是本章要用分類頭繞過、第 7 章要用指令微調正面解決的問題。`]];
+function renderPF(i){
+  $$("#pfPills .pill").forEach(b=>b.classList.toggle("on",+b.dataset.i===i));
+  $("#pfTsr").innerHTML=PF[i][0];$("#pfCap").innerHTML=PF[i][1];
+}
+$$("#pfPills .pill").forEach(b=>b.addEventListener("click",()=>renderPF(+b.dataset.i)));
+renderPF(1);
+
+/* ===== 6.5 凍結策略探索 ===== */
+const ST_LAYERS=[
+ {ico:"▦",nm:"Token + Positional embedding",p:39383808,g:[0,0,1],why:"兩張查表（第 2 章）：學到的是通用字義與位置感，任何任務都適用——凍結照用。"},
+ {ico:"▤",nm:"Transformer blocks 1–11",p:77966592,g:[0,0,1],why:"前 11 個 block 學的是通用語言結構（文法、語意）。神經網路的低層特徵最泛用——凍結。"},
+ {ico:"▤",nm:"Transformer block 12（最後一個）",p:7087872,g:[0,1,1],why:"最靠近輸出、處理最高階最任務相關的特徵。書中實驗（附錄 B）顯示解凍它能明顯提升準確率——策略 B 的關鍵。"},
+ {ico:"≈",nm:"Final LayerNorm",p:1536,g:[0,1,1],why:"輸出直接餵給分類頭的最後一道正規化，跟著最後一個 block 一起解凍，讓交接處能微調。"},
+ {ico:"◇",nm:"Classification head：Linear 768→2（新）",p:1538,g:[1,1,1],why:"全新隨機初始化的層——nn.Linear 預設 requires_grad=True，三種策略下都必須訓練（它是唯一「非學不可」的部分）。"}];
+const ST_TOTAL=124441346;
+const ST_NOTES=[
+ "<b>策略 A</b>：只學分類頭的 1,538 個參數（0.001%）。技術上可行，但整個特徵萃取都被鎖死，準確率明顯較低。",
+ "<b>策略 B（書中做法）</b>：7,090,946 個可訓練參數（5.7%）——效果與效率的甜蜜點，本章所有實測數字都出自這個設定。",
+ "<b>策略 C</b>：全部 124,441,346 個參數解凍（練習 6.2）。小資料上更容易 overfit、訓練也慢得多。"];
+let stMode=1;
+function fmtN(n){return n.toLocaleString("en-US");}
+function renderST(capHTML){
+  $$("#stSeg button").forEach(b=>b.classList.toggle("on",+b.dataset.s===stMode));
+  $("#stStack").innerHTML=ST_LAYERS.map((l,i)=>{
+    const tr=l.g[stMode]===1;
+    return `<div class="layer ${tr?'train':''}" data-i="${i}"><span class="ico">${tr?'✎':'🔒'}</span><span class="nm">${l.nm}</span><span class="st">requires_grad=${tr?'True':'False'}</span></div>`;
+  }).join("");
+  $$("#stStack .layer").forEach(el=>el.addEventListener("click",()=>{
+    const l=ST_LAYERS[+el.dataset.i],tr=l.g[stMode]===1;
+    renderST(`<b>${l.nm}</b>（${fmtN(l.p)} 參數 · ${tr?"✎ 可訓練":"🔒 凍結"}）— ${l.why}`);
+  }));
+  const trainable=ST_LAYERS.filter(l=>l.g[stMode]===1).reduce((a,l)=>a+l.p,0);
+  $("#stNum").textContent=fmtN(trainable);
+  const pct=trainable/ST_TOTAL*100;
+  $("#stPct").textContent="可訓練 / 共 "+fmtN(ST_TOTAL)+"（"+(pct<0.01?pct.toFixed(3):pct.toFixed(1))+"%）";
+  $("#stCap").innerHTML=capHTML||ST_NOTES[stMode]+"　<span class='small'>（點任一層看它的角色）</span>";
+}
+$$("#stSeg button").forEach(b=>b.addEventListener("click",()=>{stMode=+b.dataset.s;renderST();}));
+renderST();
+
+/* ===== 6.5 為何取最後一個 token ===== */
+const LT_W=["Do","you","have","time"],LT_ID=[5211,345,423,640];
+const LT_ATT=[[1.0],[0.55,0.45],[0.38,0.30,0.32],[0.27,0.24,0.24,0.25]];
+const LT_OUT=[[-1.5854,0.9904],[-3.7235,7.4548],[-2.2661,6.6049],[-3.5983,3.9902]];
+let ltSel=3;
+function fmt2(v){return (v>=0?" ":"")+v.toFixed(4);}
+function renderLT(){
+  $("#ltChips").innerHTML=LT_W.map((w,i)=>`<span class="wchip ${i===ltSel?'hot':''}" data-i="${i}" style="cursor:pointer;${i>ltSel?'opacity:.4':''}">${w}<small>${LT_ID[i]}</small></span>`).join("");
+  $$("#ltChips .wchip").forEach(el=>el.addEventListener("click",()=>{ltSel=+el.dataset.i;renderLT();}));
+  const row=(vals,i)=>{
+    const sel=i===ltSel;
+    const s=`[${vals.map(fmt2).join(", ")}]`;
+    return `<span style="${sel?'color:var(--accent);font-weight:700':'opacity:.45'}">${s}${i<3?",":" "}   # 位置 ${i+1} "${LT_W[i]}"${i===3?"  ← outputs[:, -1, :]":""}</span>`;
+  };
+  const att=LT_ATT[ltSel].map((v,j)=>`${LT_W[j]} <b style="color:var(--accent)">${v.toFixed(2)}</b>`).join(" · ");
+  $("#ltTsr").innerHTML=`<span class="lbl"># outputs = model(inputs) → 形狀 [1, 4, 2]——每個 token 位置各有一組 2 維 logits（書中真實數值）</span>
+tensor([[ ${row(LT_OUT[0],0)}
+          ${row(LT_OUT[1],1)}
+          ${row(LT_OUT[2],2)}
+          ${row(LT_OUT[3],3)}]])
+
+<span class="lbl"># 位置 ${ltSel+1} "${LT_W[ltSel]}" 的 attention 權重（圖 6.12 真實數值）：</span>
+${att}${ltSel===3?'   <span class="lbl"># 覆蓋整句 ✓</span>':'   <span class="lbl"># 後面的字＝0（causal mask 遮掉）</span>'}`;
+  $("#ltCap").innerHTML=ltSel===3
+   ?`<b>位置 4 "time"</b> 是唯一 attention 覆蓋<b>整句</b>的 token——它的 [-3.5983, 3.9902] 就是分類用的 logits（argmax → 1「spam」，此刻還是亂猜：分類頭尚未微調）。程式寫法：<b>outputs[:, -1, :]</b>。`
+   :`<b>位置 ${ltSel+1} "${LT_W[ltSel]}"</b> 的 attention 只分佈在前 ${ltSel+1} 個字——它「沒讀過」後面的內容，這格的 logits 只反映半句話，拿來分類會漏資訊。<b>點最後一格 "time" 對照 →</b>`;
+}
+renderLT();
+
+/* ===== 6.6 softmax → argmax（圖 6.14）===== */
+const SM=[
+ {t:"You won the lottery",lg:[3.5983,-3.9902],p:[0.99,0.01],pred:0,truth:1},
+ {t:"Do you have time",lg:[-3.9846,5.2940],p:[0.01,0.99],pred:1,truth:0}];
+function renderSM(i){
+  $$("#smPills .pill").forEach(b=>b.classList.toggle("on",+b.dataset.i===i));
+  const m=SM[i];
+  const lab=k=>k===0?"not spam":"spam";
+  $("#smTsr").innerHTML=`<span class="lbl"># "${m.t}"（圖 6.14 數值，微調前）      index 0 = not spam · index 1 = spam</span>
+last-token logits   [${fmt2(m.lg[0])}, ${fmt2(m.lg[1])}]
+softmax             [ ${m.p[0].toFixed(2)}  ,  ${m.p[1].toFixed(2)} ]      <span class="lbl"># softmax 其實可省：對 logits 直接 argmax 結果相同</span>
+argmax → <span style="color:var(--accent);font-weight:700">${m.pred}</span> → 判成 "<span style="color:${m.pred===1?'var(--accent)':'var(--ham)'};font-weight:700">${lab(m.pred)}</span>"   <span style="color:var(--bad);font-weight:700">✗ 錯</span>（正解是 "${lab(m.truth)}"）`;
+  $("#smCap").innerHTML=`兩個例子微調前<b>都答錯</b>——分類頭是 seed 123 的隨機初始化，方向根本還沒學。注意流程與第 5 章挑「下一個字」完全一樣：softmax → argmax，只是候選從 50,257 個變 2 個。`;
+}
+$$("#smPills .pill").forEach(b=>b.addEventListener("click",()=>renderSM(+b.dataset.i)));
+renderSM(0);
+
+/* ===== 6.7 訓練播放器（書中真實數值，無內插）===== */
+const TR_STEPS=[0,50,100,150,200,250,300,350,400,450,500,550,600];
+const TR_TRAIN=[2.153,0.617,0.523,0.561,0.419,0.409,0.333,0.340,0.136,0.153,0.222,0.207,0.083];
+const TR_VAL=[2.392,0.637,0.557,0.489,0.397,0.353,0.320,0.306,0.200,0.132,0.137,0.143,0.074];
+const ACC_TR=[70.0,82.5,90.0,100.0,100.0],ACC_VA=[72.5,85.0,90.0,97.5,97.5];
+const CONSOLE_LINES=[
+ [1,"Ep 1 (Step 000000): Train loss 2.153, Val loss 2.392"],
+ [1,"Ep 1 (Step 000050): Train loss 0.617, Val loss 0.637"],
+ [1,"Ep 1 (Step 000100): Train loss 0.523, Val loss 0.557"],
+ [1,"Training accuracy: 70.00% | Validation accuracy: 72.50%"],
+ [2,"Ep 2 (Step 000150): Train loss 0.561, Val loss 0.489"],
+ [2,"Ep 2 (Step 000200): Train loss 0.419, Val loss 0.397"],
+ [2,"Ep 2 (Step 000250): Train loss 0.409, Val loss 0.353"],
+ [2,"Training accuracy: 82.50% | Validation accuracy: 85.00%"],
+ [3,"Ep 3 (Step 000300): Train loss 0.333, Val loss 0.320"],
+ [3,"Ep 3 (Step 000350): Train loss 0.340, Val loss 0.306"],
+ [3,"Training accuracy: 90.00% | Validation accuracy: 90.00%"],
+ [4,"Ep 4 (Step 000400): Train loss 0.136, Val loss 0.200"],
+ [4,"Ep 4 (Step 000450): Train loss 0.153, Val loss 0.132"],
+ [4,"Ep 4 (Step 000500): Train loss 0.222, Val loss 0.137"],
+ [4,"Training accuracy: 100.00% | Validation accuracy: 97.50%"],
+ [5,"Ep 5 (Step 000550): Train loss 0.207, Val loss 0.143"],
+ [5,"Ep 5 (Step 000600): Train loss 0.083, Val loss 0.074"],
+ [5,"Training accuracy: 100.00% | Validation accuracy: 97.50%"],
+ [5,"Training completed in 5.65 minutes."]];
+const EP_CAPS=[
+ "按「下一個 epoch」開始微調：AdamW（lr=5e-5, weight_decay=0.1）× 5 epochs，每 50 步記一次 loss。圖中所有點都是書中列印的真實數值（實心＝真實、本章無內插點）。",
+ "Ep 1：loss 2.15 → 0.52 陡降，accuracy 70.0% / 72.5%——一輪就從亂猜（≈50%）跳到七成。預訓練的語言能力讓分類頭不用從零學起。",
+ "Ep 2：loss 降到 0.41 / 0.35，accuracy 82.5% / 85.0%。注意 train 與 val 兩條線<b>貼著走</b>——完全沒有第 5 章那種 overfitting 大裂口。",
+ "Ep 3：accuracy 雙雙站上 90%。loss 曲線開始放緩，但 val 仍在下降——還值得繼續練。",
+ "Ep 4：train accuracy 100%、val 97.5%。注意：這是 eval_iter=5（只抽 5 個 batch＝40 則）的快篩估計，數字偏樂觀，期末考要看下面的全資料集數字。",
+ "Ep 5：5.65 分鐘收工。快篩維持 100% / 97.5%；接著用完整資料集算真正的成績：97.21% / 97.32% / 95.67%。"];
+let epoch=0;
+const trCv=$("#trCv"),trx=trCv.getContext("2d");
+function drawTR(){
+  const W=trCv.width,H=trCv.height,padL=48,padR=16;
+  trx.clearRect(0,0,W,H);
+  const X=st=>padL+st/650*(W-padL-padR);
+  const YL=v=>22+(1-v/2.5)*(200-22);
+  const YA=v=>252+(1-(v-40)/60)*(375-252);
+  trx.font="10px ui-monospace";trx.lineWidth=1;
+  for(const g of [0,0.5,1,1.5,2,2.5]){trx.strokeStyle=css("--line");trx.globalAlpha=.35;trx.beginPath();trx.moveTo(padL,YL(g));trx.lineTo(W-padR,YL(g));trx.stroke();trx.globalAlpha=1;trx.fillStyle=css("--faint");trx.fillText(g.toFixed(1),padL-26,YL(g)+3);}
+  for(const g of [40,60,80,100]){trx.strokeStyle=css("--line");trx.globalAlpha=.35;trx.beginPath();trx.moveTo(padL,YA(g));trx.lineTo(W-padR,YA(g));trx.stroke();trx.globalAlpha=1;trx.fillStyle=css("--faint");trx.fillText(g+"%",padL-28,YA(g)+3);}
+  for(let e=0;e<=5;e++){trx.fillStyle=css("--faint");trx.fillText("Ep"+e,X(e*130)-9,216);trx.fillText("Ep"+e,X(e*130)-9,392);}
+  trx.fillStyle=css("--faint");trx.fillText("loss（每 50 步，書中真實值）",padL,14);
+  trx.fillText("accuracy %（每 epoch 快篩，eval_iter=5）",padL,246);
+  // 亂猜基準線 50%
+  trx.strokeStyle=css("--bad");trx.setLineDash([4,4]);trx.globalAlpha=.55;trx.beginPath();trx.moveTo(padL,YA(50));trx.lineTo(W-padR,YA(50));trx.stroke();trx.setLineDash([]);trx.globalAlpha=1;
+  trx.fillStyle=css("--bad");trx.fillText("亂猜 50%（微調前 46–49%）",W-padR-160,YA(50)-5);
+  const maxStep=epoch*130;
+  function curve(xs,ys,Y,color,dash){
+    trx.strokeStyle=color;trx.lineWidth=2.4;if(dash)trx.setLineDash([6,4]);
+    trx.beginPath();let started=false;
+    xs.forEach((x,i)=>{if(x>maxStep)return;const px=X(x),py=Y(ys[i]);started?trx.lineTo(px,py):trx.moveTo(px,py);started=true;});
+    trx.stroke();trx.setLineDash([]);
+    xs.forEach((x,i)=>{if(x>maxStep)return;trx.beginPath();trx.arc(X(x),Y(ys[i]),3.4,0,7);trx.fillStyle=color;trx.fill();});
+  }
+  if(epoch>=1){
+    curve(TR_STEPS,TR_VAL,YL,css("--cool"),true);
+    curve(TR_STEPS,TR_TRAIN,YL,css("--accent"),false);
+    const ex=Array.from({length:epoch},(_,i)=>(i+1)*130);
+    curve(ex,ACC_VA.slice(0,epoch),YA,css("--cool"),true);
+    curve(ex,ACC_TR.slice(0,epoch),YA,css("--accent"),false);
+  }
+  trx.font="12px ui-monospace";
+  trx.fillStyle=css("--accent");trx.fillText("── train",W-padR-120,20);
+  trx.fillStyle=css("--cool");trx.fillText("╌╌ val",W-padR-120,38);
+  if(epoch===0){trx.fillStyle=css("--faint");trx.fillText("按「下一個 epoch」開始微調",W/2-90,110);}
+}
+function renderEP(){
+  drawTR();
+  $("#epDots").innerHTML=Array.from({length:6},(_,i)=>`<span class="dot2 ${i===epoch?'on':''}"></span>`).join("");
+  const lines=CONSOLE_LINES.filter(l=>l[0]<=epoch).map(l=>l[1]);
+  $("#epConsole").innerHTML=`<span class="lbl"># train_classifier_simple(...) 的即時輸出（書中真實數值）</span>\n`+(lines.length?lines.join("\n"):"<span class='pn'>（尚未開始）</span>");
+  $("#epCap").innerHTML=EP_CAPS[epoch];
+  $("#epPrev").disabled=epoch===0;$("#epNext").disabled=epoch===5;
+  const con=$("#epConsole");con.scrollTop=con.scrollHeight;
+}
+$("#epNext").addEventListener("click",()=>{if(epoch<5){epoch++;renderEP();}});
+$("#epPrev").addEventListener("click",()=>{if(epoch>0){epoch--;renderEP();}});
+$("#epAll").addEventListener("click",()=>{epoch=5;renderEP();});
+$("#epReset").addEventListener("click",()=>{epoch=0;renderEP();});
+renderEP();
+
+/* ===== 6.8 classify_review 播放器 ===== */
+const CV=[
+ {t:'"You are a winner you have been specially selected to receive $1000 cash or a $2000 award."',res:"spam",cls:"nw",
+  why:'<b>"spam"</b>——書中真實輸出 ✓。「你被特別選中」＋獎金誘餌，微調後的模型一眼識破。'},
+ {t:'"Hey, just wanted to check if we\'re still on for dinner tonight? Let me know!"',res:"not spam",cls:"okw",
+  why:'<b>"not spam"</b>——書中真實輸出 ✓。日常約晚餐、沒有誘餌沒有連結，正常訊息。'}];
+const CV_CAPS=[
+ "① 起點：一則模型從沒見過的新簡訊。",
+ "② 前處理與訓練時完全一致：同一個 tokenizer、超過 120 截斷、不足 120 補 50256、unsqueeze(0) 補 batch 維。",
+ "③ 一次 forward（torch.no_grad）：凍結的 GPT 讀完整句，微調過的最後一層＋分類頭給出最後一格的 2 維 logits。",
+ "④ argmax 挑大的、把 0/1 翻譯回文字——判定完成。"];
+let cvSel=0,cvTimer=null;
+function cvRender(s){
+  $$("#cv .stg").forEach(el=>el.classList.toggle("lit",+el.dataset.s<=s));
+  $("#cvOut").style.opacity=s>=3?"1":".25";
+  $("#cvCap").innerHTML=s>=0?CV_CAPS[s]:"👆 按「播放」跑一遍：簡訊 → token → 模型 → 標籤";
+}
+function cvSet(i){
+  cvSel=i;
+  $$("#cvPills .pill").forEach(b=>b.classList.toggle("on",+b.dataset.i===i));
+  $("#cvText").textContent=CV[i].t;
+  $("#cvOut").innerHTML=`<span class="small lbl">classify_review(text, model, tokenizer, device, max_length=120) → </span>"<span class="${CV[i].cls}">${CV[i].res}</span>"　<span class="small">${CV[i].why}</span>`;
+  if(cvTimer){clearInterval(cvTimer);cvTimer=null;}
+  cvRender(3);
+}
+$$("#cvPills .pill").forEach(b=>b.addEventListener("click",()=>cvSet(+b.dataset.i)));
+$("#cvPlay").addEventListener("click",()=>{
+  if(cvTimer){clearInterval(cvTimer);cvTimer=null;}
+  if(reduced){cvRender(3);return;}
+  let s=0;cvRender(0);
+  cvTimer=setInterval(()=>{s++;cvRender(s);if(s>=3){clearInterval(cvTimer);cvTimer=null;}},850);
+});
+cvSet(0);
+
+/* ===== quiz ===== */
+const quiz=[
+ {q:"SMS Spam Collection 有 4,825 則 ham、747 則 spam。為什麼要先 undersample 成 747+747？",o:["為了讓資料變多","不平衡資料下「全猜 ham」就有 86.6% 的假準確率，模型會偷懶不學分辨；平衡後亂猜基準回到誠實的 50%","spam 資料品質比較好","tokenizer 的限制"],a:1,e:"類別嚴重不平衡時，accuracy 會被多數類灌水。書中選最簡單的 undersampling：從 ham 隨機抽 747 則（random_state=123），湊成 1,494 則的平衡資料集。"},
+ {q:"簡訊長短不一，怎麼組成 batch？書中的做法是？",o:["全部截短成最短那則","把所有序列 pad 到訓練集最長的 120 tokens，填充用 token 50256（<|endoftext|>）","一則一則餵，不組 batch","隨機丟棄過長的簡訊"],a:1,e:"截短省算力但會丟資訊（spam 的破綻常在後半段）。pad 到最長保留完整內容：訓練集最長 120 tokens，val/test 也 pad 到 120、超過的截斷，batch 形狀 [8, 120]。"},
+ {q:"為什麼分類時只取「最後一個 token」位置的輸出？",o:["它的數值最大","隨便選的，取哪格都一樣","causal mask 下每個 token 只能注意自己與前面的字——只有最後一格的 attention 覆蓋整句，是唯一「讀完全文」的位置","因為 padding 都在前面"],a:2,e:"第 3 章的 causal attention mask 規定 token 只能往前看。位置 1 只讀過 1 個字、位置 2 讀過 2 個……最後一格才擁有整句的資訊，所以程式取 outputs[:, -1, :]。"},
+ {q:"把 GPT 改成分類器時，輸出層（out_head）做了什麼改動？",o:["換成 out_features=2 的新 Linear 層（768→2），對應 spam / not spam 兩類","刪掉輸出層","把 50257 維輸出接一個 if 判斷","加一層 softmax 層"],a:0,e:"原本 768→50257 的 out_head（預測下一個字）換成 768→2 的新 Linear。書中補充：二分類技術上可以只用 1 個輸出節點，但用「節點數＝類別數」的寫法最通用，cross entropy 直接可用。"},
+ {q:"書中的凍結策略是哪一種？",o:["全部參數一起微調","只訓練新的分類頭","凍結全部參數，再解凍最後一個 transformer block、final LayerNorm 與新分類頭（約 7.1M、5.7% 參數）","只訓練 embedding 層"],a:2,e:"先 requires_grad=False 凍結全部，換上的新 head 天生可訓練，再手動解凍 trf_blocks[-1] 與 final_norm。書中實驗顯示比只練 head 準確率明顯更好，又遠省於全模型微調。"},
+ {q:"微調前模型的分類 accuracy 是 46.25% / 45.00% / 48.75%，這代表什麼？",o:["權重載壞了","模型歧視 spam 類","資料切分有 bug","≈ 2 類亂猜的 50% 水準——分類頭是隨機初始化的，本來就還沒學過這個任務"],a:3,e:"二分類亂猜期望值 50%。GPT 本體的語言能力再強，新接的 768→2 頭是 seed 123 的隨機矩陣，方向還沒學——這正是需要微調的證明。"},
+ {q:"分類微調的 loss 和第 5 章預訓練的 loss 是什麼關係？",o:["完全不同的新公式","同一條 cross entropy：softmax → 取正確類別機率 → log → 平均 → 取負，只是類別從 50,257 個 token 變成 2 類；accuracy 因為不可微分，只能當監控指標","分類直接用 accuracy 當 loss 來 backward","分類用 MSE"],a:1,e:"5.1.2 的六步推導原封不動搬過來，「正確答案」從下一個 token 換成 0/1 標籤。accuracy 是階梯函數、沒有梯度，所以訓練優化 cross entropy、報告時才看 accuracy。"}];
+const qc=$("#quizBox");let ans=0,cor=0;
+quiz.forEach((it,qi)=>{const w=document.createElement("div");w.className="q";w.innerHTML=`<div class="qn">Q${qi+1} / ${quiz.length}</div><div class="qt">${it.q}</div>`;
+ it.o.forEach((o,oi)=>{const b=document.createElement("button");b.className="opt";b.innerHTML=o+'<span class="mk"></span>';
+  b.addEventListener("click",()=>{if(w.dataset.done)return;w.dataset.done=1;ans++;const ok=oi===it.a;if(ok)cor++;b.classList.add(ok?"correct":"wrong");b.querySelector(".mk").textContent=ok?"✓":"✗";if(!ok){const cb=w.querySelectorAll(".opt")[it.a];cb.classList.add("correct");cb.querySelector(".mk").textContent="✓";}w.querySelector(".exp").classList.add("show");if(ans===quiz.length)$("#score").textContent=`完成 ✓ 答對 ${cor} / ${quiz.length} 題`;});
+  w.appendChild(b);});
+ const ex=document.createElement("div");ex.className="exp";ex.textContent="▸ "+it.e;w.appendChild(ex);qc.appendChild(w);});
+
+/* 主題切換重繪 */
+new MutationObserver(()=>{drawTR();}).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{drawTR();});
+})();
+</script>
+</body>
+</html>

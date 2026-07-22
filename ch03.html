@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ch3 實作注意力機制｜互動教材</title>
+<style>
+:root{
+  --accent:#b0477f;--accent-soft:#cf6ea0;--accent-ghost:rgba(176,71,127,.12);
+  --bg:#ece7ea;--grid:rgba(30,18,26,.05);--surface:#f8f4f6;--surface-2:#eee6ea;
+  --ink:#1e121a;--muted:#6a5560;--faint:#9a8892;
+  --line:rgba(30,18,26,.14);--line-strong:rgba(30,18,26,.28);
+  --ok:#3f8a52;--bad:#c0492f;--cool:#3f72af;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"PingFang TC","Noto Sans TC","Segoe UI",sans-serif;
+  --maxw:1220px;--read:68ch;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0d080b;--grid:rgba(207,110,160,.06);--surface:#171016;--surface-2:#20141d;
+  --ink:#eddfe8;--muted:#a892a1;--faint:#6f5c68;--line:rgba(240,220,232,.13);--line-strong:rgba(240,220,232,.26);
+  --accent:#d074a6;--accent-soft:#e496c1;--accent-ghost:rgba(208,116,166,.16);--ok:#5faf70;--bad:#e2694f;--cool:#6f9ede;}}
+:root[data-theme="light"]{--bg:#ece7ea;--grid:rgba(30,18,26,.05);--surface:#f8f4f6;--surface-2:#eee6ea;--ink:#1e121a;--muted:#6a5560;--faint:#9a8892;--line:rgba(30,18,26,.14);--line-strong:rgba(30,18,26,.28);--accent:#b0477f;--accent-soft:#cf6ea0;--accent-ghost:rgba(176,71,127,.12);--ok:#3f8a52;--bad:#c0492f;--cool:#3f72af;}
+:root[data-theme="dark"]{--bg:#0d080b;--grid:rgba(207,110,160,.06);--surface:#171016;--surface-2:#20141d;--ink:#eddfe8;--muted:#a892a1;--faint:#6f5c68;--line:rgba(240,220,232,.13);--line-strong:rgba(240,220,232,.26);--accent:#d074a6;--accent-soft:#e496c1;--accent-ghost:rgba(208,116,166,.16);--ok:#5faf70;--bad:#e2694f;--cool:#6f9ede;}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.68;-webkit-font-smoothing:antialiased;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:30px 30px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+a{color:var(--accent)}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:70;transition:width .1s}
+header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 88%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:52px}
+.brand{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px}.brand b{color:var(--ink)}
+.chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--accent);color:var(--accent);border-radius:2px}
+.spacer{flex:1}.tbtn{font-family:var(--mono);font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:3px;padding:5px 10px;cursor:pointer}.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+/* 全域訓練閉環圖 */
+.map{position:sticky;top:52px;z-index:49;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:8px 0 6px}
+.map .wrap{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:none}
+.map .wrap::-webkit-scrollbar{display:none}
+.mapstage{flex:none;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);cursor:pointer;transition:.25s;white-space:nowrap}
+.mapstage .em{font-size:12px}
+.mapstage:hover{border-color:var(--accent-soft)}
+.mapstage.lit{background:var(--accent);color:#2a0818;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ghost)}
+.mapsep{flex:none;color:var(--faint);padding:0 2px;font-size:11px}
+.mapsub{font-family:var(--mono);font-size:11px;color:var(--accent);padding:3px 0 0;min-height:16px}
+.mapsub b{color:var(--ink)}
+@media(max-width:700px){.mapstage{font-size:10px;padding:4px 7px}}
+/* layout */
+.shell{display:grid;grid-template-columns:186px minmax(0,1fr);gap:40px;padding-top:28px}
+@media(max-width:960px){.shell{grid-template-columns:1fr;gap:0}}
+nav.toc{position:sticky;top:118px;align-self:start;font-family:var(--mono);font-size:12px;max-height:calc(100vh - 140px);overflow:auto}
+@media(max-width:960px){nav.toc{display:none}}
+nav.toc .lbl{color:var(--faint);letter-spacing:.14em;font-size:10px;text-transform:uppercase;margin-bottom:10px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--ink);border-color:var(--line-strong)}nav.toc a.active{color:var(--accent);border-color:var(--accent)}
+main{min-width:0}
+.hero{padding:6px 0 26px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(26px,4.6vw,42px);line-height:1.06;margin:0;letter-spacing:-.01em}
+h1 .sub{display:block;font-size:clamp(14px,2.2vw,18px);color:var(--muted);font-weight:500;margin-top:10px}
+.lede{font-size:16px;color:var(--muted);max-width:var(--read);margin:16px 0 0}
+section{padding:38px 0;border-bottom:1px solid var(--line);scroll-margin-top:132px}
+.sh{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;flex-wrap:wrap}
+.sh .num{font-family:var(--mono);color:var(--accent);font-size:13px;font-weight:600}
+h2{font-family:var(--mono);font-weight:600;font-size:clamp(18px,2.8vw,24px);margin:0;letter-spacing:-.01em}
+h3{font-family:var(--mono);font-size:15px;margin:28px 0 8px;font-weight:600;color:var(--ink)}
+p{max-width:var(--read);margin:12px 0;color:var(--muted)}p strong,li strong{color:var(--ink)}
+.en{font-family:var(--mono);font-size:.92em;color:var(--accent);font-weight:600}
+ul.clean{max-width:var(--read);padding-left:0;list-style:none;margin:14px 0}ul.clean li{position:relative;padding-left:20px;margin:8px 0;color:var(--muted)}
+ul.clean li::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+.plain{max-width:var(--read);background:var(--accent-ghost);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 16px;margin:16px 0;font-size:14.5px;color:var(--ink)}
+.plain .ph{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent);font-weight:700;margin-bottom:5px}
+.plain p{margin:6px 0 0;color:var(--ink);max-width:none}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.small{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+canvas{display:block;width:100%;height:auto}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:14px 0}
+pre .c{color:var(--faint)}pre .k{color:var(--accent)}
+code.inl{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:var(--ink)}
+.btn{font-family:var(--mono);font-size:12.5px;padding:8px 15px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#2a0818;cursor:pointer;font-weight:600}
+.btn.ghost{background:none;color:var(--accent)}.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font-family:var(--mono);font-size:12px;padding:7px 12px;background:var(--surface-2);border:none;border-right:1px solid var(--line);cursor:pointer;color:var(--muted)}
+.seg button:last-child{border-right:none}.seg button.on{background:var(--accent);color:#2a0818}
+.pill{font-family:var(--mono);font-size:12px;padding:6px 11px;border:1px solid var(--line);background:var(--surface-2);border-radius:20px;cursor:pointer;color:var(--muted)}
+.pill:hover{border-color:var(--accent);color:var(--accent)}.pill.on{background:var(--accent);color:#2a0818;border-color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+input[type=range]{-webkit-appearance:none;height:4px;border-radius:3px;background:var(--surface-2);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+/* tensor（array）呈現 */
+.tsr{font-family:var(--mono);font-size:12.5px;line-height:1.9;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.tsr .pn{color:var(--faint)}
+.tsr .lbl{color:var(--faint);font-size:11px}
+.tn{display:inline-block;padding:0 5px;border-radius:5px;transition:.12s;cursor:default}
+.tn:hover,.tn.hot{background:var(--accent);color:#2a0818!important}
+.tn.dimmed{opacity:.35}
+.tn.neg{color:var(--cool)}
+.tsrnote{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-height:18px;margin-top:8px}
+.tsrnote b{color:var(--ink)}
+/* 積木進度（本章 7 個步驟） */
+.bricks{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin:14px 0}
+.brick{font-family:var(--mono);font-size:11.5px;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--muted);cursor:pointer;transition:.25s;display:flex;gap:8px;align-items:flex-start}
+.brick .ck{width:16px;height:16px;flex:none;border:1.5px solid var(--line-strong);border-radius:4px;display:grid;place-items:center;font-size:10px;color:#fff;margin-top:1px}
+.brick.done{border-color:var(--ok);color:var(--ink)}.brick.done .ck{background:var(--ok);border-color:var(--ok)}
+.brick.now{border-color:var(--accent);background:var(--accent-ghost);color:var(--ink);box-shadow:0 0 0 3px var(--accent-ghost)}
+.brick.now .ck{border-color:var(--accent);color:var(--accent)}
+/* 句子 chips */
+.sent{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+.wchip{font-family:var(--mono);font-size:13.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);cursor:default;transition:.12s}
+.wchip.hot{background:var(--accent);color:#2a0818;border-color:var(--accent)}
+.wchip small{display:block;font-size:9.5px;color:var(--faint);text-align:center}
+.wchip.hot small{color:#2a0818}
+/* stepper 共用 */
+.stepbar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.dots{display:flex;gap:6px;align-items:center;margin-left:auto}
+.dot2{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}.dot2.on{background:var(--accent)}
+.stepcap{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--accent-ghost);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;padding:11px 14px;margin-top:12px;min-height:42px}
+.stepcap b{color:var(--accent)}
+/* code-line stepper */
+.codelines{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 0;overflow-x:auto}
+.cl{padding:3px 16px;white-space:pre;color:var(--muted);border-left:3px solid transparent;transition:.2s}
+.cl.lit{background:var(--accent-ghost);border-left-color:var(--accent);color:var(--ink)}
+.cl .cm{color:var(--faint)}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--accent-ghost);border-radius:0 8px 8px 0;padding:12px 15px;margin:16px 0;max-width:var(--read);font-size:14px;color:var(--muted)}.note b{color:var(--accent)}
+/* 機率矩陣表 */
+.cmtable{border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.cmtable th,.cmtable td{border:1px solid var(--line);padding:7px 10px;text-align:center}
+.cmtable th{color:var(--muted);font-weight:600;background:var(--surface-2);font-size:11px}
+.cmtable td.tgt{outline:2px solid var(--accent);outline-offset:-2px;font-weight:700;color:var(--accent)}
+.cmtable td.amx{background:var(--accent-ghost)}
+.cmtable td.dim{color:var(--faint)}
+/* 訓練/推論 模式徽章 */
+.mode{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;vertical-align:3px;margin-left:10px;white-space:nowrap}
+.mode.train{background:color-mix(in srgb,var(--cool) 16%,transparent);color:var(--cool);border:1px solid var(--cool)}
+.mode.infer{background:var(--accent-ghost);color:var(--accent);border:1px solid var(--accent)}
+/* io 卡 */
+.iocard{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin:12px 0 6px;overflow-x:auto;padding-bottom:2px}
+.iocard .io{display:flex;flex-direction:column;justify-content:center;text-align:center;padding:8px 12px;border-radius:8px;line-height:1.5;flex:none}
+.iocard .in,.iocard .out{border:1.5px dashed var(--line-strong);color:var(--muted);background:var(--surface)}
+.iocard .out{border-color:var(--accent-soft)}
+.iocard .box{border:1.5px solid var(--accent);background:var(--accent-ghost);color:var(--ink);font-weight:600}
+.iocard .box small{display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px}
+.iocard .ioarrow{align-self:center;color:var(--faint);flex:none}
+/* 往返動畫（文字→ID→模型→文字） */
+.w2e{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;min-height:90px}
+.w2e .stg{opacity:.22;transition:opacity .45s,transform .45s;transform:translateY(5px);flex:none}
+.w2e .stg.lit{opacity:1;transform:none}
+.w2e .arrow{color:var(--faint);font-size:10.5px;text-align:center;line-height:1.5}
+.w2e .wordbig{font-size:15px;font-weight:700;color:var(--accent);border:1.5px solid var(--accent);border-radius:10px;padding:10px 14px;background:var(--accent-ghost)}
+.w2e .idbig{font-size:13px;font-weight:600;border:1.5px solid var(--line-strong);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
+.decoded{font-family:var(--mono);font-size:13.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;min-height:44px}
+.decoded .nw{color:var(--accent);font-weight:700}
+.decoded .bad2{color:var(--bad);font-weight:700}
+/* 機率長條 */
+.pbrow{display:grid;grid-template-columns:76px 1fr 150px;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;margin:5px 0;color:var(--muted)}
+.pbrow .barwrap{background:var(--surface-2);border-radius:3px;height:16px;overflow:hidden}
+.pbrow .bar{height:100%;background:var(--accent);opacity:.8;transition:width .25s}
+.pbrow.amx{color:var(--ink);font-weight:600}.pbrow.amx .bar{opacity:1}
+.pbrow.zero .bar{background:var(--line-strong)}
+.pbrow .cnum{font-variant-numeric:tabular-nums}
+/* token 視窗塊（train/val split） */
+.winrow{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0;align-items:center}
+.win{width:24px;height:16px;border-radius:4px;background:var(--accent);opacity:.85;flex:none}
+.win.val{background:var(--cool)}
+.win.drop{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,var(--line) 4px,var(--line) 6px);border:1px dashed var(--line-strong);opacity:.9}
+.winleg{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px}
+.winleg i{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:5px}
+/* perplexity 標尺 */
+.pxtrack{position:relative;height:52px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;margin:10px 0}
+.pxmark{position:absolute;top:0;bottom:0;width:2px;background:var(--line-strong)}
+.pxmark span{position:absolute;top:-2px;left:5px;font-family:var(--mono);font-size:9.5px;color:var(--faint);white-space:nowrap}
+.pxdot{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);transition:left .15s}
+/* quiz */
+.quiz .q{margin:18px 0}.quiz .qn{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:7px}.quiz .qt{font-weight:600;color:var(--ink);max-width:var(--read);margin-bottom:9px}
+.opt{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 14px;margin:6px 0;cursor:pointer;font-family:var(--sans);font-size:14px;color:var(--ink);max-width:var(--read)}
+.opt:hover{border-color:var(--accent)}.opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.opt .mk{float:right;font-family:var(--mono);font-weight:700}.opt.correct .mk{color:var(--ok)}.opt.wrong .mk{color:var(--bad)}
+.exp{max-width:var(--read);font-size:13px;color:var(--muted);padding:9px 14px;border-left:2px solid var(--accent);margin:5px 0 0;display:none}.exp.show{display:block}
+.foot{font-family:var(--mono);font-size:11px;color:var(--faint);padding:28px 0 70px;text-align:center;line-height:1.9}
+kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+/* ch3 增補 */
+.cmtable th.qth{cursor:pointer}
+.cmtable th.qth:hover{color:var(--accent)}
+.cmtable th.qth.sel{color:var(--accent);outline:2px solid var(--accent);outline-offset:-2px}
+.cmtable tr.selrow td{font-weight:600}
+.cmtable td.blk{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,var(--line) 4px,var(--line) 6px);color:var(--faint)}
+.cmtable td.drop0{color:var(--bad);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.cmtable td.hovc{outline:2px solid var(--accent);outline-offset:-2px}
+.twohalf{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.twohalf{grid-template-columns:1fr}}
+.half h4{font-family:var(--mono);font-size:12px;margin:0 0 8px;color:var(--muted);font-weight:600}
+.headbar{display:flex;gap:3px;margin:10px 0}
+.headbar .hseg{flex:1;height:34px;border-radius:6px;display:grid;place-items:center;font-family:var(--mono);font-size:10.5px;color:#2a0818;background:var(--accent);white-space:nowrap;overflow:hidden}
+.headbar .hseg:nth-child(even){background:var(--accent-soft)}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<header class="top"><div class="wrap">
+  <div class="brand"><span class="chip">CH·3</span><b><a href="index.html" style="color:inherit;text-decoration:none">從零打造 LLM</a></b><span style="color:var(--faint)">/ 實作注意力機制</span></div>
+  <div class="spacer"></div><button class="tbtn" id="themeBtn">◐ 主題</button>
+</div></header>
+
+<div class="map">
+  <div class="wrap" id="mapRow"></div>
+  <div class="wrap"><div class="mapsub" id="mapSub"></div></div>
+</div>
+
+<div class="wrap"><div class="shell">
+  <nav class="toc" aria-label="章節導覽">
+    <div class="lbl">Chapter 3</div>
+    <a href="#sec-intro">本章定位 · 四段進化</a>
+    <a href="#sec-31">3.1 長序列的難題</a>
+    <a href="#sec-32">3.2 attention 的由來</a>
+    <a href="#sec-331">3.3.1 簡化版 self-attn</a>
+    <a href="#sec-332">3.3.2 一次算全部 token</a>
+    <a href="#sec-34">3.4 可訓練權重 QKV</a>
+    <a href="#sec-35">3.5 causal attention</a>
+    <a href="#sec-36">3.6 multi-head</a>
+    <a href="#sec-sum">本章小結</a>
+    <a href="#sec-quiz">✓ 知識檢核</a>
+  </nav>
+
+  <main>
+    <div class="hero" id="top">
+      <p class="eyebrow">Build a Large Language Model (From Scratch) · Chapter 3</p>
+      <h1>實作注意力機制<span class="sub">Coding attention mechanisms</span></h1>
+      <p class="lede">第 2 章把文字切成 token、變成 embedding 向量；但這些向量彼此孤立——「journey」不知道旁邊站著「Your」。本章實作 LLM 的心臟 <span class="en">attention</span>：讓每個 token 回頭看整句話、按相關性向其他 token「借」資訊。我們會從無訓練權重的簡化版出發，一路升級成 GPT 在用的 <span class="en">multi-head causal attention</span>。頁面中標註「書中真實輸出」的數值都與書一致。</p>
+    </div>
+
+    <!-- ===== 本章定位 ===== -->
+    <section id="sec-intro" data-map="all">
+      <div class="sh"><span class="num">00</span><h2>本章定位：LLM 的心臟</h2></div>
+      <p>整本書的三階段地圖裡，本章是 <strong>Stage 1 的第 2 步</strong>——也是整個架構裡最關鍵的零件。第 2 章的資料處理已完成，attention 做好之後，第 4 章把它裝進 GPT：</p>
+      <div class="iocard">
+        <span class="io in">ch2 ✓ 資料處理<br>文字 → token → embedding</span><span class="ioarrow">→</span>
+        <span class="io box">本章：attention 機制<small>simplified → QKV → causal → multi-head</small></span><span class="ioarrow">→</span>
+        <span class="io out">ch4 GPT 架構 → ch5 預訓練<br>→ ch6–7 微調</span>
+      </div>
+      <p>本章用<strong>四段進化</strong>把 attention 蓋出來，每一段都在前一段上加一個零件——<strong>會隨你往下讀自動打勾</strong>（也可以點擊跳到該節）：</p>
+      <div class="bricks" id="bricks"></div>
+      <div class="plain"><div class="ph">🔰 先建立心態</div><p>attention 一句話就講完：<strong>對序列裡的每個 token，算出「其他每個 token 跟我多相關」的一組權重，再按權重把大家的向量加權平均，得到一個融合了上下文的新向量</strong>（context vector）。本章從頭到尾都在重複同一條三步公式——<b>分數 → softmax → 加權求和</b>——只是逐步加料：可訓練權重、遮未來的 mask、防過擬合的 dropout、多頭並行。抓住這條主線，全章都不會迷路。</p></div>
+      <div class="stage"><div class="tsr"><span class="lbl"># 本章終點：親手寫出這個類別（ch4 會原封不動裝進 TransformerBlock）</span>
+mha = MultiHeadAttention(d_in=768, d_out=768, context_length=1024,
+                         dropout=0.1, num_heads=12)   <span class="lbl"># ← GPT-2 124M 的注意力模組</span>
+
+<span class="lbl"># 教學過程用迷你尺寸（d_in=3、d_out=2、6 個 token），所有數字都看得見、算得完。</span></div></div>
+    </section>
+
+    <!-- ===== 3.1 ===== -->
+    <section id="sec-31" data-map="all">
+      <div class="sh"><span class="num">3.1</span><h2>The problem with modeling long sequences（長序列的難題）</h2></div>
+      <div class="iocard"><span class="io in">input：德文句子<br>8 個 token</span><span class="ioarrow">→</span><span class="io box">encoder–decoder RNN<small>整句壓進一顆固定大小的 hidden state</small></span><span class="ioarrow">→</span><span class="io out">output：英文翻譯<br>（句子一長就走樣）</span></div>
+      <p>先看 attention 出現之前的世界。以翻譯為例：<strong>逐字直譯行不通</strong>——德文和英文的語序、文法結構不同，某些字必須「看到句子其他位置」才能翻對。transformer 之前的主流解法是 <span class="en">encoder–decoder RNN</span>：encoder 把整句讀完、壓成一顆 <span class="en">hidden state</span>，decoder 再從這顆向量開始逐字生出翻譯。<strong>切換三種做法，看問題出在哪：</strong></p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="rnnSeg">
+          <button data-m="0" class="on">① 逐字直譯</button>
+          <button data-m="1">② encoder–decoder RNN</button>
+          <button data-m="2">③ attention（本章主角）</button>
+        </span></div>
+        <div id="rnnStage" style="min-height:150px"></div>
+        <div class="stepcap" id="rnnCap"></div>
+      </div>
+      <div class="note"><b>RNN 的瓶頸一句話：</b>decoder 只拿得到<strong>最後一顆 hidden state</strong>，看不到 encoder 中途的任何狀態。整句話——不管 8 個字還是 80 個字——都得塞進同一顆固定大小的向量，長句的前段資訊自然被稀釋、遺失。</div>
+    </section>
+
+    <!-- ===== 3.2 ===== -->
+    <section id="sec-32" data-map="all">
+      <div class="sh"><span class="num">3.2</span><h2>Capturing data dependencies with attention mechanisms（attention 的由來）</h2></div>
+      <div class="iocard"><span class="io in">2014：Bahdanau attention<br>幫 RNN 裝上「選擇性回看」</span><span class="ioarrow">→</span><span class="io box">2017：transformer<small>發現根本不需要 RNN——self-attention 就夠</small></span><span class="ioarrow">→</span><span class="io out">GPT 系列<br>本書實作的對象</span></div>
+      <p>2014 年的 <span class="en">Bahdanau attention</span> 對症下藥：讓 decoder 每生成一個字，都能<strong>直接回看輸入序列的全部位置</strong>，並用一組權重決定「現在該多看誰」——上一節第 ③ 個分頁演的就是這件事。三年後（2017）研究者發現更激進的事實：RNN 根本可以整個拿掉，只靠 attention 就能建出更強的架構——<span class="en">transformer</span> 就此誕生。</p>
+      <div class="plain"><div class="ph">🔰 self-attention 的「self」是什麼意思？</div><p>Bahdanau attention 連接的是<b>兩條序列</b>（輸入的德文 ↔ 輸出的英文）；<span class="en">self-attention</span> 則是<b>同一條序列自己看自己</b>：句子裡每個 token 對「同句的所有 token」計算相關性。它的產出是把每個 token 的 embedding 升級成含上下文的表示——這正是 GPT 每一層在做的事，也是本章接下來要親手實作的東西。</p></div>
+    </section>
+
+    <!-- ===== 3.3.1 ===== -->
+    <section id="sec-331" data-map="s-x,s-score,s-soft,s-ctx">
+      <div class="sh"><span class="num">3.3.1</span><h2>A simple self-attention mechanism（簡化版：先懂概念）</h2></div>
+      <div class="iocard"><span class="io in">input：inputs [6, 3]<br>6 個 token 的 embedding</span><span class="ioarrow">→</span><span class="io box">點積算分數 → softmax → 加權求和<small>整章唯一的一條公式，先用「無訓練權重」版走一遍</small></span><span class="ioarrow">→</span><span class="io out">output：context vector<br>z² [3]</span></div>
+      <p>全章的工作句子：<span class="en">"Your journey starts with one step"</span>——六個 token，每個已經是 3 維 embedding（書中為了排版選了迷你維度；真實 GPT 是 768 維起跳）。我們指定第 2 個 token <b>journey（x²）</b>當 <span class="en">query</span>：「以 journey 的視角，該注意誰？」</p>
+      <h3>第一步的核心：點積＝相似度</h3>
+      <p>attention score 的算法出奇地簡單：<strong>query 和每個 token 的 embedding 做點積</strong>（對應元素相乘再相加）。點積衡量兩個向量的「對齊程度」——方向愈接近、值愈大。<strong>滑過任何一個 token</strong>，看 journey 對它的分數怎麼算出來：</p>
+      <div class="stage">
+        <div class="sent" id="dpChips"></div>
+        <div class="tsr" id="dpTsr"></div>
+        <div class="tsr" id="dpRow" style="margin-top:8px"></div>
+        <div class="tsrnote" id="dpNote">滑過上面任何一個 token 試試 →</div>
+      </div>
+      <div class="note"><b>讀出直覺：</b>journey 對 <b>starts</b> 的分數 1.4754 幾乎跟對自己（1.4950）一樣高——兩者的 embedding 恰好很像；對 <b>one</b> 只有 0.7070。attention 就靠這種「相似度」決定資訊該從誰身上流過來。</div>
+      <h3>三步組出 context vector（書中真實數值）</h3>
+      <p>拿到分數之後還差兩步：把分數<strong>正規化</strong>成總和為 1 的權重，再用權重對所有 embedding <strong>加權求和</strong>。<strong>按「下一步」逐步推導：</strong></p>
+      <div class="stage">
+        <div class="tsr" id="saTsr"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="saPrev">← 上一步</button>
+          <button class="btn" id="saNext">下一步 →</button>
+          <span class="dots" id="saDots"></span>
+        </div>
+        <div class="stepcap" id="saCap"></div>
+      </div>
+      <div class="plain"><div class="ph">🔰 context vector 到底是什麼？</div><p>原本的 x² 只代表「journey 這個詞本身」；z² 則是「<b>journey 眼中的整句話</b>」——按注意力比例把六個向量攪拌在一起：13.85% 的 Your ＋ 23.79% 的自己 ＋ 23.33% 的 starts ＋ …。維度不變（還是 3 維），但資訊變多了：它同時記得自己是誰、以及上下文長什麼樣。LLM 後續所有預測，用的都是這種「攪拌過」的表示。</p></div>
+    </section>
+
+    <!-- ===== 3.3.2 ===== -->
+    <section id="sec-332" data-map="s-x,s-score,s-soft,s-ctx">
+      <div class="sh"><span class="num">3.3.2</span><h2>Computing attention weights for all input tokens（一次算全部 token）</h2></div>
+      <div class="iocard"><span class="io in">input：inputs [6, 3]</span><span class="ioarrow">→</span><span class="io box">inputs @ inputs.T → softmax(dim=-1) → @ inputs<small>三行矩陣乘法，取代兩層 for 迴圈</small></span><span class="ioarrow">→</span><span class="io out">output：all_context_vecs [6, 3]<br>六個 context vector 一次到位</span></div>
+      <p>剛才只服務了 journey 一個 query。但每個 token 都需要自己的 context vector——把「query 對所有 token 點積」推廣成「<strong>所有 token 對所有 token</strong>」，就得到 6×6 的注意力矩陣。for 迴圈太慢，一個矩陣乘法 <code class="inl">inputs @ inputs.T</code> 全包。<strong>切換分數／權重，點左側 token 選 query 列，滑過格子看數值</strong>（底色深淺＝數值大小；書中真實輸出）：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="hmSeg">
+          <button data-m="0">attn_scores（點積）</button>
+          <button data-m="1" class="on">attn_weights（softmax 後）</button>
+        </span></div>
+        <div style="overflow-x:auto"><table class="cmtable" id="hmTable"></table></div>
+        <div class="tsrnote" id="hmNote">點左側的 token 換 query 列；滑過格子看單一數值</div>
+        <div class="tsr" id="hmCtx" style="margin-top:10px"></div>
+      </div>
+      <pre><span class="c"># 整個 3.3 節，濃縮成三行（形狀： [6,3] @ [3,6] → [6,6] → [6,6] @ [6,3] → [6,3]）</span>
+attn_scores  = inputs @ inputs.T                    <span class="c"># 所有 pair 的點積</span>
+attn_weights = torch.<span class="k">softmax</span>(attn_scores, dim=-1)   <span class="c"># dim=-1：對「每一列」正規化</span>
+all_context_vecs = attn_weights @ inputs            <span class="c"># 每列權重 × 所有 embedding</span></pre>
+      <div class="note"><b>驗算：</b>矩陣第 2 列算出的 context vector [0.4419, 0.6515, 0.5683] 和上一節手算的 z² 一模一樣 ✓。<b>dim=-1</b> 的意思是沿最後一個維度（列內的行方向）做 softmax——所以「每一列」總和為 1，一列＝一個 query 的注意力分佈。</div>
+    </section>
+
+    <!-- ===== 3.4 ===== -->
+    <section id="sec-34" data-map="s-qkv,s-score,s-scale,s-soft,s-ctx">
+      <div class="sh"><span class="num">3.4</span><h2>Implementing self-attention with trainable weights（可訓練權重：scaled dot-product）</h2></div>
+      <div class="iocard"><span class="io in">input：x [6, 3]</span><span class="ioarrow">→</span><span class="io box">W_q / W_k / W_v 投影 → q·kᵀ ÷ √d_k → softmax → @ values<small>scaled dot-product attention——GPT 真正在用的版本</small></span><span class="ioarrow">→</span><span class="io out">output：context [6, 2]<br>（d_out=2）</span></div>
+      <p>簡化版有個致命限制：<strong>「相似度」被 embedding 寫死了</strong>，模型沒有任何可以學的東西。升級的方式：點積前先讓向量過三個<strong>可訓練</strong>的投影矩陣 <span class="en">W_q / W_k / W_v</span>——它們是注意力模組裡唯一的權重參數，訓練時逐步調整，讓模型「學會」該用什麼標準去衡量相關性。</p>
+      <div class="plain"><div class="ph">🔰 query / key / value 是什麼比喻？</div><p>借自資料庫檢索：<b>query</b>＝搜尋語句（我現在想找什麼）、<b>key</b>＝索引（每筆資料用來被比對的標籤）、<b>value</b>＝內容（真正要取回的東西）。attention 的流程就是：拿 query 跟每個 key 比對（點積），比對結果決定從每個 value 取多少。同一個 token 會同時擁有 q、k、v 三種身分——分別由三個 W 投影出來。</p></div>
+      <p>照舊以 journey（x²）當主角，d_in=3、d_out=2（書中故意讓輸出維度不同，方便看清楚形狀；真實 GPT 裡 d_in=d_out）。<strong>按「下一步」逐步推導</strong>（書中真實數值，seed 123）：</p>
+      <div class="stage">
+        <div class="tsr" id="qkTsr"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="qkPrev">← 上一步</button>
+          <button class="btn" id="qkNext">下一步 →</button>
+          <span class="dots" id="qkDots"></span>
+        </div>
+        <div class="stepcap" id="qkCap"></div>
+      </div>
+      <div class="plain"><div class="ph">🔰 兩種「權重」別搞混</div><p><b>權重參數</b>（weight parameters，W_q/W_k/W_v 裡的數字）：訓練學出來的，訓練完就固定；<b>注意力權重</b>（attention weights，0.1500、0.2264…）：每句話<b>現算</b>的，隨輸入而變。前者是「評分標準」，後者是「這一句的評分結果」。</p></div>
+
+      <h3>為什麼要除以 √d_k？拖拖看</h3>
+      <p>維度 <span class="en">d_k</span> 愈大，點積是愈多項的加總，數值天然愈大；大分數進 softmax 會把分佈推成幾乎 one-hot——softmax 進入「飽和區」，梯度趨近 0，模型學不動。除以 <span class="en">√d_k</span> 恰好把分數的變異數拉回原尺度。<strong>拖動 d_k</strong>（以 journey 的六個分數模擬放大，softmax 為即時計算）：</p>
+      <div class="stage">
+        <div class="controls" style="gap:14px">
+          <span class="small">d_k = <b id="dkVal" style="color:var(--accent)">2</b></span>
+          <input type="range" id="dkSlider" min="1" max="9" step="1" value="1" style="flex:1;min-width:180px">
+          <span class="small">（GPT-2 每個 head 的 d_k = 64）</span>
+        </div>
+        <div class="twohalf">
+          <div class="half"><h4>❌ 不縮放：softmax(q·kᵀ)</h4><div id="dkL"></div></div>
+          <div class="half"><h4>✓ 有縮放：softmax(q·kᵀ / √d_k)</h4><div id="dkR"></div></div>
+        </div>
+        <div class="stepcap" id="dkCap"></div>
+      </div>
+
+      <h3>包成類別：SelfAttention_v1 → v2</h3>
+      <pre>class SelfAttention_v1(nn.Module):
+    def __init__(self, d_in, d_out):
+        super().__init__()
+        self.W_query = nn.Parameter(torch.rand(d_in, d_out))   <span class="c"># W_key / W_value 同</span>
+    def forward(self, x):
+        queries = x @ self.W_query ; keys = x @ self.W_key ; values = x @ self.W_value
+        attn_scores  = queries @ keys.T
+        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**<span class="k">0.5</span>, dim=-1)
+        return attn_weights @ values               <span class="c"># ← context vectors</span></pre>
+      <div class="stage"><div class="tsr"><span class="lbl"># sa_v1 = SelfAttention_v1(3, 2)（seed 123）——六個 token 的 context vectors（書中真實輸出）</span>
+tensor([[0.2996, 0.8053],
+        [<span style="color:var(--accent);font-weight:700">0.3061, 0.8210</span>],   <span class="lbl"># ← 第 2 列＝剛才手算的 journey context ✓</span>
+        [0.3058, 0.8203],
+        [0.2948, 0.7939],
+        [0.2927, 0.7891],
+        [0.2990, 0.8040]], grad_fn=&lt;MmBackward0&gt;)</div></div>
+      <div class="note"><b>v2 只改一件事：</b>把 <code class="inl">nn.Parameter(torch.rand(...))</code> 換成 <code class="inl">nn.Linear(d_in, d_out, bias=qkv_bias)</code>。數學相同（bias 關掉時 Linear 就是矩陣乘法），但 nn.Linear 的<b>權重初始化方案更好</b>、訓練更穩——所以 v2（seed 789）的輸出（第一列 [-0.0739, 0.0713]…）和 v1 不同純粹是<b>初始值不同</b>，機制一模一樣。<code class="inl">qkv_bias</code> 這個參數是 ch5 的伏筆：載入 OpenAI GPT-2 權重時要設 True。</div>
+    </section>
+
+    <!-- ===== 3.5 ===== -->
+    <section id="sec-35" data-map="s-mask,s-soft,s-drop">
+      <div class="sh"><span class="num">3.5</span><h2>Hiding future words with causal attention（遮住未來：因果注意力）</h2></div>
+      <div class="iocard"><span class="io in">input：attn_scores [6, 6]</span><span class="ioarrow">→</span><span class="io box">上三角填 −inf → softmax → dropout<small>每個位置只准看「自己與過去」</small></span><span class="ioarrow">→</span><span class="io out">output：causal attn_weights<br>上三角精確為 0</span></div>
+      <p>GPT 的任務是<strong>預測下一個字</strong>。訓練時整句一起算，如果 journey 的 context vector 裡混進了 starts、step 的資訊，就等於<strong>作弊看到未來</strong>——預測「journey 的下一個字」時答案已經洩題。解法：把注意力矩陣<strong>對角線以上</strong>（每列的未來位置）遮掉。這叫 <span class="en">causal attention</span>（也稱 masked attention）。</p>
+      <h3>兩種遮法對照：為什麼 −inf 才是標準答案</h3>
+      <p>直覺做法（A）：先照常 softmax，再把上三角歸零、每列重新除以列和——可行，但要三步。標準做法（B）：<strong>在分數階段就把上三角填 −inf，softmax 一步到位</strong>。<strong>切換做法、按步驟走</strong>（書中真實數值，權重來自上一節的 sa_v2）：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="cmSeg">
+          <button data-m="0" class="on">做法 A：先 softmax 再歸零（3 步）</button>
+          <button data-m="1">做法 B：先 −inf 再 softmax（2 步・標準）</button>
+        </span></div>
+        <div style="overflow-x:auto"><table class="cmtable" id="cmTable"></table></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="cmPrev">← 上一步</button>
+          <button class="btn" id="cmNext">下一步 →</button>
+          <span class="dots" id="cmDots"></span>
+        </div>
+        <div class="stepcap" id="cmCap"></div>
+      </div>
+      <div class="plain"><div class="ph">🔰 做法 A 會不會「資訊洩漏」？</div><p>乍看之下 A 有個疑慮：第①步的 softmax 分母<b>包含了未來位置</b>，未來似乎影響過剩下的數值。但書中點出 softmax 的數學性質：歸零＋重新正規化之後，結果<b>恰好等於「一開始就只在可見範圍內做 softmax」</b>——未來位置的影響被完整抵消，兩條路殊途同歸（你可以在上面驗證：A 第③步 ≡ B 第②步）。B 勝出是因為省步驟、數值更穩；而且 −inf 這招之後還會再見——ch5 的 top-k sampling 用的是同一手。</p></div>
+
+      <h3>再加一層保險：dropout</h3>
+      <p>訓練時隨機把一部分注意力權重<strong>歸零</strong>，逼模型不要過度依賴任何特定位置——這是對抗 overfitting 的經典手段。被留下的值要 <strong>×1/(1−p) 補償</strong>，讓整列的期望值不變。<strong>拖動 dropout 率、按「重抽」換遮罩</strong>（在 causal 權重上模擬；瀏覽器端固定種子亂數）：</p>
+      <div class="stage">
+        <div class="controls" style="gap:14px">
+          <span class="small">dropout p = <b id="drVal" style="color:var(--accent)">0.50</b></span>
+          <input type="range" id="drSlider" min="0.1" max="0.8" step="0.05" value="0.5" style="flex:1;min-width:160px">
+          <button class="btn ghost" id="drBtn">🎲 重抽遮罩</button>
+        </div>
+        <div style="overflow-x:auto"><table class="cmtable" id="drTable"></table></div>
+        <div class="stepcap" id="drCap"></div>
+      </div>
+      <div class="stage"><div class="tsr"><span class="lbl"># 對照：書中 torch 的真實輸出（seed 123、p=0.5、套在 causal 權重上）——規則相同、遮罩位置不同（RNG 不同）</span>
+tensor([[2.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+        [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],   <span class="lbl"># 整列被丟光也可能發生</span>
+        [0.7599, 0.6194, 0.6206, 0.0000, 0.0000, 0.0000],   <span class="lbl"># 0.3800×2＝0.7599（×1/(1−0.5) 補償）</span>
+        [0.0000, 0.4921, 0.4925, 0.0000, 0.0000, 0.0000],
+        [0.0000, 0.3966, 0.0000, 0.3775, 0.0000, 0.0000],
+        [0.0000, 0.3327, 0.3331, 0.3084, 0.3331, 0.0000]])</div></div>
+      <div class="note"><b>只在訓練時開！</b>dropout 是訓練的正則化手段，推論時一律關閉（ch5 會看到 <code class="inl">model.eval()</code> 就是在關它）。書中示範用 p=0.5 好看清楚；實際訓練 GPT 用 0.1–0.2。</div>
+
+      <h3>包成類別：CausalAttention（點一行看說明）</h3>
+      <p>把 mask 和 dropout 收進類別，同時讓 forward 支援 <strong>batch 輸入</strong>——第 2 章 data loader 吐出來的可是 [batch, tokens, d_in] 的三維 tensor（書中用 <code class="inl">batch = torch.stack((inputs, inputs))</code> → [2, 6, 3] 模擬）：</p>
+      <div class="stage">
+        <div class="codelines" id="caLines"></div>
+        <div class="stepcap" id="caCap">👆 點一行程式，看它為什麼這樣寫</div>
+      </div>
+      <div class="stage"><div class="tsr"><span class="lbl"># ca = CausalAttention(d_in=3, d_out=2, context_length=6, dropout=0.0)（seed 123）</span>
+context_vecs = ca(batch)
+context_vecs.shape: torch.Size([<span style="color:var(--accent);font-weight:700">2, 6, 2</span>])   <span class="lbl"># [batch, tokens, d_out]——形狀正確，可以接 batch 了</span></div></div>
+    </section>
+
+    <!-- ===== 3.6 ===== -->
+    <section id="sec-36" data-map="s-qkv,s-ctx">
+      <div class="sh"><span class="num">3.6</span><h2>Extending single-head attention to multi-head attention（多頭注意力）</h2></div>
+      <div class="iocard"><span class="io in">input：x [2, 6, d_in]</span><span class="ioarrow">→</span><span class="io box">num_heads 組 causal attention 並行 → 串接 → out_proj<small>每個 head 在自己的子空間學不同的注意模式</small></span><span class="ioarrow">→</span><span class="io out">output：[2, 6, d_out]<br>本章最終成品</span></div>
+      <p>一組 W_q/W_k/W_v 只能學<strong>一種</strong>「相關性的標準」。<span class="en">multi-head attention</span> 讓多組投影並行——有的 head 可能學語法關係、有的學指代關係——各自算出 context 後串接起來。最直觀的實作是<strong>疊 wrapper</strong>：</p>
+      <pre>class MultiHeadAttentionWrapper(nn.Module):
+    def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
+        super().__init__()
+        self.heads = nn.ModuleList([CausalAttention(d_in, d_out, context_length, dropout, qkv_bias)
+                                    for _ in range(num_heads)])   <span class="c"># num_heads 個獨立單頭</span>
+    def forward(self, x):
+        return torch.cat([head(x) for head in self.heads], dim=-1) <span class="c"># 沿最後一維串接</span></pre>
+      <p>num_heads=2、每頭 d_out=2 → 串接後每個 token 變成 <b>2×2＝4 維</b>（書中真實輸出，seed 123；顏色區分兩個 head）：</p>
+      <div class="stage"><div class="tsr" id="wrTsr"></div></div>
+      <div class="note"><b>練習 3.2 的答案藏在形狀裡：</b>想讓最終輸出是 2 維、又維持 num_heads=2？把每頭的 <code class="inl">d_out</code> 改成 <b>1</b> 就行——輸出維度＝d_out × num_heads。另外注意兩個 batch 的輸出完全相同，因為書中的 batch 是同一句話疊兩次。</div>
+
+      <h3>高效版：一次大投影，再「切」出多頭</h3>
+      <p>wrapper 的缺點：<code class="inl">for head in self.heads</code> 是<strong>串行</strong>跑 num_heads 次矩陣乘法。<span class="en">MultiHeadAttention</span> 類別改成：<strong>只做一次大投影（d_out 維），再用 view / transpose 把它「切」成 num_heads 份</strong>，批次矩陣乘法一次算完所有 head。<strong>點頭數，看形狀流與參數量</strong>（以 GPT-2 尺寸 d_out=768 示範）：</p>
+      <div class="stage">
+        <div class="controls" id="mhPills">
+          <button class="pill" data-h="1">1 頭</button>
+          <button class="pill" data-h="2">2 頭</button>
+          <button class="pill" data-h="4">4 頭</button>
+          <button class="pill" data-h="6">6 頭</button>
+          <button class="pill on" data-h="12">12 頭（GPT-2）</button>
+        </div>
+        <div class="headbar" id="mhBar"></div>
+        <div class="tsr" id="mhTsr"></div>
+        <div class="stepcap" id="mhCap"></div>
+      </div>
+      <pre><span class="c"># MultiHeadAttention.forward 的核心（d_out 必須能被 num_heads 整除）</span>
+keys = self.W_key(x)                    <span class="c"># [b, T, d_out]——一次大投影</span>
+keys = keys.view(b, T, num_heads, head_dim)        <span class="c"># 「切」出 head 維（免費，只是重新解讀）</span>
+keys = keys.transpose(<span class="k">1, 2</span>)                        <span class="c"># [b, heads, T, head_dim]——head 提前，方便批次運算</span>
+attn_scores = queries @ keys.transpose(<span class="k">2, 3</span>)       <span class="c"># [b, heads, T, T]：每頭一張注意力矩陣，一次算完</span>
+attn_scores.masked_fill_(mask_bool, -torch.inf)    <span class="c"># causal mask 照舊</span>
+attn_weights = torch.softmax(attn_scores / head_dim**<span class="k">0.5</span>, dim=-1)   <span class="c"># √d_k 用的是 head_dim</span>
+context = (attn_weights @ values).transpose(1, 2)  <span class="c"># 換回 [b, T, heads, head_dim]</span>
+context = context.contiguous().view(b, T, d_out)   <span class="c"># 串接＝把 head 維攤平</span>
+return self.out_proj(context)                      <span class="c"># 出場前再過一個 Linear 融合各頭（慣例配備）</span></pre>
+      <div class="stage"><div class="tsr"><span class="lbl"># mha = MultiHeadAttention(d_in=3, d_out=2, context_length=6, dropout=0.0, num_heads=2)（seed 123，書中真實輸出）</span>
+tensor([[[0.3190, 0.4858],   <span class="lbl"># Your</span>
+         [0.2943, 0.3897],   <span class="lbl"># journey</span>
+         [0.2856, 0.3593],   <span class="lbl"># starts</span>
+         [0.2693, 0.3873],   <span class="lbl"># with</span>
+         [0.2639, 0.3928],   <span class="lbl"># one</span>
+         [0.2575, 0.4028]],  <span class="lbl"># step</span>
+        [[…同上，第二個 batch…]]], grad_fn=&lt;ViewBackward0&gt;)
+context_vecs.shape: torch.Size([<span style="color:var(--accent);font-weight:700">2, 6, 2</span>])   <span class="lbl"># 這次 d_out=2 是「總維度」，每頭 head_dim=1</span></div></div>
+      <div class="note"><b>本章完成！</b>這個 MultiHeadAttention 類別會<strong>原封不動</strong>進入第 4 章的 TransformerBlock（12 層、每層 12 頭、768 維），再由第 5 章訓練它。GPT-2 最小版 12 頭、768 維；最大版（1.5B）25 頭、1600 維——同一份程式碼，只改參數。</div>
+    </section>
+
+    <!-- ===== 小結 ===== -->
+    <section id="sec-sum" data-map="all">
+      <div class="sh"><span class="num">▣</span><h2>本章小結</h2></div>
+      <ul class="clean">
+        <li><b>為什麼要 attention</b>：RNN 把整句壓進一顆固定 hidden state，長句必失真；attention 讓每個位置直接回看所有位置。</li>
+        <li><b>一條主線公式</b>：分數（點積）→ softmax 正規化 → 對 value 加權求和 → context vector。全章四個版本都是它的加料版。</li>
+        <li><b>簡化版</b>：分數＝embedding 兩兩點積（inputs @ inputs.T）；journey 的 z² = [0.4419, 0.6515, 0.5683]。</li>
+        <li><b>可訓練版（scaled dot-product）</b>：x 先過 W_q/W_k/W_v 投影；分數除以 √d_k 防止 softmax 飽和、梯度消失；nn.Linear 版（v2）初始化更好。</li>
+        <li><b>causal mask</b>：分數上三角填 −inf 再 softmax（一步到位、數學上等價於「只在可見範圍 softmax」）——生成式 LLM 不准偷看未來。</li>
+        <li><b>dropout</b>：訓練時隨機丟權重、倖存值 ×1/(1−p) 補償；推論時關閉。</li>
+        <li><b>multi-head</b>：d_out 切成 num_heads × head_dim，view / transpose 批次算完；參數量與頭數無關。GPT-2 124M：12 頭 × 64 維。</li>
+      </ul>
+    </section>
+
+    <section id="sec-quiz" data-map="all">
+      <div class="sh"><span class="num">✓</span><h2>知識檢核</h2></div>
+      <p class="small" style="margin-bottom:14px">// 七題，作答後立即看解析</p>
+      <div class="quiz" id="quizBox"></div>
+      <div id="score" style="font-family:var(--mono);font-size:14px;color:var(--accent);margin-top:16px"></div>
+    </section>
+
+    <div class="foot">從零打造 LLM · 第 3 章互動教材 ｜ 講解為原創文字，程式碼與數值對應 Sebastian Raschka《Build a Large Language Model (From Scratch)》Ch.3 的公開程式與執行輸出，非原文翻譯<br>標註「書中真實輸出」的數值皆與書一致；其餘互動為瀏覽器即時運算　·　快捷鍵 <kbd>T</kbd> 切換主題</div>
+  </main>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const root=document.documentElement;
+$("#themeBtn").addEventListener("click",()=>{const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",cur==="dark"?"light":"dark");});
+addEventListener("keydown",e=>{if(e.target.matches&&e.target.matches("input,textarea"))return;if(e.key==="t"||e.key==="T")$("#themeBtn").click();});
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const f4=x=>{const s=x.toFixed(4);return s==="-0.0000"?"0.0000":s;};
+
+/* ===== 共用資料（書中真實數值）===== */
+const TOKS=["Your","journey","starts","with","one","step"];
+const SUP=["¹","²","³","⁴","⁵","⁶"];
+const X=[[0.43,0.15,0.89],[0.55,0.87,0.66],[0.57,0.85,0.64],[0.22,0.58,0.33],[0.77,0.25,0.10],[0.05,0.80,0.55]];
+const SC2=[0.9544,1.4950,1.4754,0.8434,0.7070,1.0865];
+const W2NAIVE=[0.1455,0.2278,0.2249,0.1285,0.1077,0.1656];
+const W2SOFT=[0.1385,0.2379,0.2333,0.1240,0.1082,0.1581];
+const Z2=[0.4419,0.6515,0.5683];
+const SCORES=[[0.9995,0.9544,0.9422,0.4753,0.4576,0.6310],[0.9544,1.4950,1.4754,0.8434,0.7070,1.0865],[0.9422,1.4754,1.4570,0.8296,0.7154,1.0605],[0.4753,0.8434,0.8296,0.4937,0.3474,0.6565],[0.4576,0.7070,0.7154,0.3474,0.6654,0.2935],[0.6310,1.0865,1.0605,0.6565,0.2935,0.9450]];
+const WEIGHTS=[[0.2098,0.2006,0.1981,0.1242,0.1220,0.1452],[0.1385,0.2379,0.2333,0.1240,0.1082,0.1581],[0.1390,0.2369,0.2326,0.1242,0.1108,0.1565],[0.1435,0.2074,0.2046,0.1462,0.1263,0.1720],[0.1526,0.1958,0.1975,0.1367,0.1879,0.1295],[0.1385,0.2184,0.2128,0.1420,0.0988,0.1896]];
+const CTX=[[0.4421,0.5931,0.5790],[0.4419,0.6515,0.5683],[0.4431,0.6496,0.5671],[0.4304,0.6298,0.5510],[0.4671,0.5910,0.5266],[0.4177,0.6503,0.5645]];
+const TS2=[1.2705,1.8524,1.8111,1.0795,0.5577,1.5440];
+const TW2=[0.1500,0.2264,0.2199,0.1311,0.0906,0.1820];
+const CW=[[0.1921,0.1646,0.1652,0.1550,0.1721,0.1510],[0.2041,0.1659,0.1662,0.1496,0.1665,0.1477],[0.2036,0.1659,0.1662,0.1498,0.1664,0.1480],[0.1869,0.1667,0.1668,0.1571,0.1661,0.1564],[0.1830,0.1669,0.1670,0.1588,0.1658,0.1585],[0.1935,0.1663,0.1666,0.1542,0.1666,0.1529]];
+const CNORM=[[1.0000,0,0,0,0,0],[0.5517,0.4483,0,0,0,0],[0.3800,0.3097,0.3103,0,0,0],[0.2758,0.2460,0.2462,0.2319,0,0],[0.2175,0.1983,0.1984,0.1888,0.1971,0],[0.1935,0.1663,0.1666,0.1542,0.1666,0.1529]];
+const SCM=[[0.2899,null,null,null,null,null],[0.4656,0.1723,null,null,null,null],[0.4594,0.1703,0.1731,null,null,null],[0.2642,0.1024,0.1036,0.0186,null,null],[0.2183,0.0874,0.0882,0.0177,0.0786,null],[0.3408,0.1270,0.1290,0.0198,0.1290,0.0078]];
+const WRAP=[[-0.4519,0.2216,0.4772,0.1063],[-0.5874,0.0058,0.5891,0.3257],[-0.6300,-0.0632,0.6202,0.3860],[-0.5675,-0.0843,0.5478,0.3589],[-0.5526,-0.0981,0.5321,0.3428],[-0.5299,-0.1081,0.5077,0.3493]];
+function softmax(a){const m=Math.max(...a);const e=a.map(x=>Math.exp(x-m));const s=e.reduce((p,q)=>p+q,0);return e.map(x=>x/s);}
+
+/* ===== 全域管線圖 ===== */
+const STAGES=[
+ {id:"s-x",em:"🧩",label:"x embedding"},{id:"s-qkv",em:"🎛",label:"W_q·W_k·W_v"},{id:"s-score",em:"⚡",label:"注意力分數"},
+ {id:"s-scale",em:"➗",label:"÷√d_k"},{id:"s-mask",em:"🙈",label:"causal mask"},{id:"s-soft",em:"📊",label:"softmax"},
+ {id:"s-drop",em:"🎲",label:"dropout"},{id:"s-ctx",em:"🎯",label:"context vector"}];
+$("#mapRow").innerHTML=STAGES.map((s,i)=>`<div class="mapstage" data-id="${s.id}"><span class="em">${s.em}</span>${s.label}</div>`+(i<STAGES.length-1?'<span class="mapsep">›</span>':'')).join("");
+$$(".mapstage").forEach(el=>el.addEventListener("click",()=>{const sec=[...$$("section")].find(s=>{const m=s.dataset.map||"";return m!=="all"&&m.split(",").includes(el.dataset.id);});if(sec){sec.scrollIntoView();}else{document.getElementById("sec-34").scrollIntoView();}}));
+function setMap(sec){
+  const raw=(sec&&sec.dataset.map)||"all";
+  const ids=raw==="all"?STAGES.map(s=>s.id):raw.split(",");
+  $$(".mapstage").forEach(el=>el.classList.toggle("lit",ids.includes(el.dataset.id)));
+  if(raw==="all"){$("#mapSub").innerHTML=`multi-head causal attention 完整管線：embedding → QKV 投影 → 分數 → ÷√d_k → mask → softmax → dropout → 加權求和`;}
+  else{const lbls=ids.map(id=>STAGES.find(s=>s.id===id).label);$("#mapSub").innerHTML=`本節用到：<b>${lbls.join(" · ")}</b>（亮起的環節）`;}
+}
+
+/* ===== 積木（四段進化）===== */
+const BRICKS=[["①","Simplified：無權重版","sec-331","sec-332"],["②","＋trainable W_q/W_k/W_v","sec-34","sec-34"],["③","＋causal mask · dropout","sec-35","sec-35"],["④","＋multi-head 多頭","sec-36","sec-36"]];
+$("#bricks").innerHTML=BRICKS.map(b=>`<div class="brick" data-sec="${b[2]}" data-end="${b[3]}"><span class="ck"></span><span><b>${b[0]}</b> ${b[1]}</span></div>`).join("");
+$$(".brick").forEach(el=>el.addEventListener("click",()=>document.getElementById(el.dataset.sec).scrollIntoView()));
+const SEC_ORDER=["sec-intro","sec-31","sec-32","sec-331","sec-332","sec-34","sec-35","sec-36","sec-sum","sec-quiz"];
+function setBricks(curId){
+  const cur=SEC_ORDER.indexOf(curId);
+  $$(".brick").forEach(el=>{
+    const a=SEC_ORDER.indexOf(el.dataset.sec),b=SEC_ORDER.indexOf(el.dataset.end);
+    el.classList.toggle("done",cur>b);
+    el.classList.toggle("now",cur>=a&&cur<=b);
+    el.querySelector(".ck").textContent=el.classList.contains("done")?"✓":"";
+  });
+}
+
+/* nav + prog */
+const secs=$$("section, .hero"),links=$$("nav.toc a");
+function onScroll(){
+  const h=document.documentElement;$("#prog").style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+"%";
+  let cur=secs[0];for(const s of secs)if(s.getBoundingClientRect().top<=150)cur=s;
+  links.forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+cur.id));
+  setMap(cur.tagName==="SECTION"?cur:null);
+  setBricks(cur.id);
+}
+addEventListener("scroll",onScroll,{passive:true});onScroll();
+
+/* ===== 3.1 三種做法 ===== */
+const DE=["Kannst","du","mir","helfen","diesen","Satz","zu","uebersetzen"];
+const ENW=["Can","you","me","help","this","sentence","to","translate"];
+const ENR=["Can","you","help","me","to","translate","this","sentence"];
+const EN2DE=[0,1,3,2,6,7,4,5];
+let rnnMode=0,rnnFocus=5;
+function rnnChips(arr,cls){return `<div class="sent" style="margin:6px 0">`+arr+`</div>`;}
+function renderRNN(){
+  const box=$("#rnnStage");
+  if(rnnMode===0){
+    box.innerHTML=rnnChips(DE.map(w=>`<span class="wchip">${w}</span>`).join(""))+
+      `<div class="small" style="margin:2px 0 6px">↓ 一個字翻一個字、位置不動</div>`+
+      rnnChips(ENW.map((w,i)=>`<span class="wchip" style="${w!==ENR[i]?'border-color:var(--bad);color:var(--bad)':''}">${w}</span>`).join(""));
+    $("#rnnCap").innerHTML=`「Can you <b style="color:var(--bad)">me help</b>…」——紅色的字全在錯的位置。正確翻譯是 "Can you help me to translate this sentence"：<b>help 要看到 mir、translate 要看到句尾的 uebersetzen</b> 才能就定位。翻譯（和一切語言理解）需要跨位置的資訊。`;
+  }else if(rnnMode===1){
+    box.innerHTML=rnnChips(DE.map(w=>`<span class="wchip">${w}</span>`).join(""))+
+      `<div class="w2e" style="min-height:0;margin:4px 0"><span class="stg lit arrow">encoder 逐字讀入 →</span><span class="stg lit"><span class="idbig" style="border-color:var(--accent)">hidden state<br><span class="small">一顆固定大小的向量</span></span></span><span class="stg lit arrow">→ decoder 只能靠它</span></div>`+
+      rnnChips(ENR.map(w=>`<span class="wchip">${w}</span>`).join(""));
+    $("#rnnCap").innerHTML=`encoder–decoder RNN：整句的所有資訊都得<b>擠進中間那一顆 hidden state</b>。8 個字還行，80 個字呢？前段的資訊在一路更新中被稀釋——這就是長序列的瓶頸。`;
+  }else{
+    const main=EN2DE[rnnFocus];
+    let w=DE.map((_,j)=>j===main?0.55:(Math.abs(j-main)===1?0.13:0.04));
+    const s=w.reduce((a,b)=>a+b,0);w=w.map(v=>v/s);
+    box.innerHTML=rnnChips(DE.map((word,j)=>{const pct=Math.round(w[j]*100);return `<span class="wchip" style="background:color-mix(in srgb,var(--accent) ${Math.min(90,pct*1.6)}%,var(--surface-2));${pct>30?'color:#2a0818;border-color:var(--accent);':''}">${word}<small style="${pct>30?'color:#2a0818':''}">${pct}%</small></span>`;}).join(""))+
+      `<div class="small" style="margin:2px 0 6px">↑ 生成下方每個字時，模型「按權重」直接回看<b>整個輸入</b>（示意權重）——點下面的字換焦點</div>`+
+      rnnChips(ENR.map((word,i)=>`<span class="wchip ${i===rnnFocus?'hot':''}" data-i="${i}" style="cursor:pointer">${word}</span>`).join(""));
+    $$("#rnnStage .wchip[data-i]").forEach(c=>c.addEventListener("click",()=>{rnnFocus=+c.dataset.i;renderRNN();}));
+    $("#rnnCap").innerHTML=`attention：生成「<b>${ENR[rnnFocus]}</b>」的當下，最需要「<b>${DE[main]}</b>」→ 給它最高權重。<b>沒有瓶頸</b>——每一步都能直達所有輸入位置。2014 年它還是 RNN 的外掛（Bahdanau attention）；2017 年 transformer 直接讓它當主角。`;
+  }
+}
+$$("#rnnSeg button").forEach(b=>b.addEventListener("click",()=>{$$("#rnnSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");rnnMode=+b.dataset.m;renderRNN();}));
+renderRNN();
+
+/* ===== 3.3.1 點積 hover ===== */
+let dpHot=-1;
+function renderDP(){
+  $("#dpChips").innerHTML=TOKS.map((t,i)=>`<span class="wchip ${i===dpHot?'hot':''}" data-i="${i}">${t}${i===1?'<small>x²＝query</small>':`<small>x${SUP[i]}</small>`}</span>`).join("");
+  $("#dpTsr").innerHTML=`<span class="lbl"># inputs——"Your journey starts with one step" 的 3 維 embedding（書中數值）</span>\n`+
+    X.map((r,i)=>{const hot=i===dpHot,isQ=i===1;
+      const nums=r.map(v=>v.toFixed(2)).join(", ");
+      const st=hot?"background:var(--accent-ghost);outline:1px solid var(--accent);border-radius:5px;":"";
+      return `<span style="display:inline-block;width:100%;${st}"><span class="pn">${i===0?'tensor([[':'        ['}</span>${nums}<span class="pn">${i===5?']])':'],'}</span>   <span class="lbl"># ${TOKS[i].padEnd(7)} (x${SUP[i]})${isQ?' ← query':''}</span></span>`;}).join("\n");
+  $("#dpRow").innerHTML=`<span class="lbl"># attn_scores_2——journey 對每個 token 的點積（書中真實輸出）</span>\n[`+
+    SC2.map((v,i)=>`<span data-i="${i}" style="padding:0 3px;border-radius:4px;cursor:default;${i===dpHot?'background:var(--accent);color:#2a0818;font-weight:700':''}">${f4(v)}</span>`).join('<span class="pn">, </span>')+`]`;
+  if(dpHot>=0){
+    const i=dpHot,q=X[1],x=X[i];
+    const terms=q.map((qv,d)=>`${qv.toFixed(2)}×${x[d].toFixed(2)}`).join(" + ");
+    const dot=q.reduce((s,qv,d)=>s+qv*x[d],0);
+    $("#dpNote").innerHTML=`x² · x${SUP[i]}（journey · ${TOKS[i]}）= ${terms} = <b>${f4(dot)}</b>${i===1?"——自己跟自己的點積通常最大":i===2?"——starts 的 embedding 和 journey 很像，分數幾乎追平「自己」":""}`;
+  } else $("#dpNote").textContent="滑過上面任何一個 token 試試 →";
+}
+function bindDP(){
+  $$("#dpChips .wchip, #dpRow span[data-i]").forEach(el=>{
+    el.addEventListener("mouseenter",()=>{dpHot=+el.dataset.i;renderDP();bindDP();});
+  });
+  $("#dpChips").addEventListener("mouseleave",()=>{dpHot=-1;renderDP();bindDP();},{once:true});
+}
+renderDP();bindDP();
+
+/* ===== 3.3.1 三步 stepper ===== */
+const SA_STEPS=4;let saStep=0;
+function renderSA(){
+  let h=`<span class="lbl"># step 1 — 分數：query（journey）對所有 token 的點積</span>\nattn_scores_2 = [${SC2.map(f4).join(", ")}]`;
+  if(saStep>=1)h+=`\n\n<span class="lbl"># step 2 — 天真的正規化：直接除以總和（可行，但非主流）</span>\nattn_scores_2 / attn_scores_2.sum() = [${W2NAIVE.map(f4).join(", ")}]   <span class="lbl"># 總和 1.0 ✓</span>`;
+  if(saStep>=2)h+=`\n\n<span class="lbl"># step 3 — 實務標準：softmax（先取 e 的次方再正規化）</span>\nattn_weights_2 = torch.softmax(attn_scores_2, dim=0)\n               = [${W2SOFT.map((v,i)=>i===1?`<span style="color:var(--accent);font-weight:700">${f4(v)}</span>`:f4(v)).join(", ")}]   <span class="lbl"># 總和 1.0 ✓</span>`;
+  if(saStep>=3)h+=`\n\n<span class="lbl"># step 4 — 加權求和：每個 embedding × 自己的權重，再全部相加</span>\nz² = 0.1385·x¹ + 0.2379·x² + 0.2333·x³ + 0.1240·x⁴ + 0.1082·x⁵ + 0.1581·x⁶\n   = [<span style="color:var(--accent);font-weight:700">${Z2.map(f4).join(", ")}</span>]   <span class="lbl"># journey 的 context vector ✓</span>`;
+  $("#saTsr").innerHTML=h;
+  const caps=[
+   "<b>step 1</b>：六個分數（ω₂₁…ω₂₆）就是上面 hover 實驗算的那排點積。注意它們總和不是 1、也可能為負——還不能當「比例」用。",
+   "<b>step 2</b>：除以總和是最直覺的正規化。書中先示範它，是為了說明「正規化」的目的：把分數變成<b>總和為 1 的比例</b>，方便解讀也讓訓練穩定。",
+   "<b>step 3</b>：實務用 <b>softmax</b>：先過指數再正規化。好處：輸出恆為正（可解讀成機率）、對極端值的行為更好、梯度性質利於訓練。journey 自己拿到最高的 0.2379。",
+   "<b>step 4</b>：用權重把六個 embedding 加權平均 → z² = [0.4419, 0.6515, 0.5683]。<b>分數 → softmax → 加權求和</b>，這條三步公式接下來會反覆出現。"];
+  $("#saCap").innerHTML=caps[saStep];
+  $("#saDots").innerHTML=Array.from({length:SA_STEPS},(_,i)=>`<span class="dot2 ${i===saStep?'on':''}"></span>`).join("");
+  $("#saPrev").disabled=saStep===0;$("#saNext").disabled=saStep===SA_STEPS-1;
+}
+$("#saNext").addEventListener("click",()=>{if(saStep<SA_STEPS-1){saStep++;renderSA();}});
+$("#saPrev").addEventListener("click",()=>{if(saStep>0){saStep--;renderSA();}});
+renderSA();
+/* ===== 3.3.2 6×6 熱度矩陣 ===== */
+let hmMode=1,hmSel=1;
+function renderHM(){
+  const M=hmMode?WEIGHTS:SCORES;
+  const flat=M.flat(),mx=Math.max(...flat),mn=Math.min(...flat);
+  let t=`<tr><th>Query＼Key</th>`+TOKS.map(k=>`<th>${k}</th>`).join("")+`<th>Σ 列和</th></tr>`;
+  M.forEach((row,i)=>{
+    t+=`<tr class="${i===hmSel?'selrow':''}"><th class="qth ${i===hmSel?'sel':''}" data-i="${i}">${TOKS[i]} (x${SUP[i]})</th>`;
+    row.forEach((v,j)=>{
+      const tt=(v-mn)/(mx-mn);
+      const pct=Math.round(tt*88);
+      t+=`<td data-i="${i}" data-j="${j}" style="background:color-mix(in srgb,var(--accent) ${pct}%,var(--surface-2));color:${tt>0.55?'#2a0818':'var(--muted)'}">${hmMode?f4(v):v.toFixed(2)}</td>`;
+    });
+    t+=`<td class="dim">${hmMode?'1.0000':'—'}</td></tr>`;
+  });
+  $("#hmTable").innerHTML=t;
+  $$("#hmTable th.qth").forEach(th=>th.addEventListener("click",()=>{hmSel=+th.dataset.i;renderHM();}));
+  $$("#hmTable td[data-j]").forEach(td=>{
+    td.addEventListener("mouseenter",()=>{
+      $$("#hmTable td.hovc").forEach(x=>x.classList.remove("hovc"));td.classList.add("hovc");
+      const i=+td.dataset.i,j=+td.dataset.j,v=M[i][j];
+      $("#hmNote").innerHTML=hmMode
+        ?`「${TOKS[i]}」分給「${TOKS[j]}」的注意力＝<b>${f4(v)}</b>（${(v*100).toFixed(1)}%）${i===j?"——對角線＝自己看自己，通常偏高":""}`
+        :`x${SUP[i]} · x${SUP[j]}（${TOKS[i]} · ${TOKS[j]}）＝<b>${f4(v)}</b>——點積對稱：跟 x${SUP[j]} · x${SUP[i]} 相同`;
+    });
+  });
+  const w=WEIGHTS[hmSel],c=CTX[hmSel];
+  $("#hmCtx").innerHTML=`<span class="lbl"># 選中的 query「${TOKS[hmSel]}」→ 它的 context vector（all_context_vecs 第 ${hmSel+1} 列，書中真實輸出）</span>\nz${SUP[hmSel]} = ${w.map((v,j)=>`${f4(v)}·x${SUP[j]}`).join(" + ")}\n   = [<span style="color:var(--accent);font-weight:700">${c.map(f4).join(", ")}</span>]${hmSel===1?`   <span class="lbl"># 和 3.3.1 手算的 z² 一致 ✓</span>`:""}`;
+}
+$$("#hmSeg button").forEach(b=>b.addEventListener("click",()=>{$$("#hmSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");hmMode=+b.dataset.m;renderHM();}));
+renderHM();
+
+/* ===== 3.4 QKV stepper ===== */
+const QK_STEPS=5;let qkStep=0;
+function renderQK(){
+  let h=`<span class="lbl"># step 1 — 設定：三個可訓練投影矩陣（唯一的新零件）</span>\nx_2 = inputs[1]                       <span class="lbl"># journey [0.55, 0.87, 0.66]</span>\nd_in, d_out = 3, 2\ntorch.manual_seed(123)\nW_query = nn.Parameter(torch.rand(d_in, d_out))   <span class="lbl"># [3,2]；W_key、W_value 同</span>`;
+  if(qkStep>=1)h+=`\n\n<span class="lbl"># step 2 — 投影：同一個 x 產生三種身分</span>\nquery_2 = x_2 @ W_query = [<span style="color:var(--accent);font-weight:700">0.4306, 1.4551</span>]   <span class="lbl"># journey 的「提問」</span>\nkeys    = inputs @ W_key     <span class="lbl"># shape [6, 2]——全部 token 的「索引」</span>\nvalues  = inputs @ W_value   <span class="lbl"># shape [6, 2]——全部 token 的「內容」</span>`;
+  if(qkStep>=2)h+=`\n\n<span class="lbl"># step 3 — 分數：q 對每個 k 點積（不再直接用 embedding！）</span>\nattn_score_22 = query_2 · keys[1] = <span style="color:var(--accent);font-weight:700">1.8524</span>\nattn_scores_2 = query_2 @ keys.T\n              = [${TS2.map((v,i)=>i===1?`<span style="color:var(--accent);font-weight:700">${f4(v)}</span>`:f4(v)).join(", ")}]`;
+  if(qkStep>=3)h+=`\n\n<span class="lbl"># step 4 — 縮放 ＋ softmax：除以 √d_k = √2</span>\nattn_weights_2 = torch.softmax(attn_scores_2 / d_k**0.5, dim=-1)\n               = [${TW2.map(f4).join(", ")}]`;
+  if(qkStep>=4)h+=`\n\n<span class="lbl"># step 5 — 加權求和：權重 × values（注意：不再是 × inputs）</span>\ncontext_vec_2 = attn_weights_2 @ values = [<span style="color:var(--accent);font-weight:700">0.3061, 0.8210</span>]   <span class="lbl"># journey 的新 context，d_out=2 維</span>`;
+  $("#qkTsr").innerHTML=h;
+  const caps=[
+   "<b>step 1</b>：W_q/W_k/W_v 是注意力模組唯一「可訓練」的東西，先用 torch.rand 隨機初始化——「好的值」要等 ch5 訓練才學得到（書中設 requires_grad=False 只是為了輸出乾淨）。",
+   "<b>step 2</b>：query 只需要 journey 的（我們只服務這一個位置），但 <b>key/value 要全部 6 個 token 的</b>——比對和取內容都要用到大家。3 維輸入被投影成 2 維。",
+   "<b>step 3</b>：流程和 3.3 一模一樣，只是點積的雙方從「原始 embedding」換成「投影後的 q 和 k」——<b>相似度的定義本身變成可學的</b>。ω₂₂＝1.8524 可以在整排的第 2 個位置驗證 ✓。",
+   "<b>step 4</b>：唯一的新動作：softmax 前先<b>除以 √d_k</b>——這就是「scaled dot-product attention」名字的由來。為什麼非除不可？看下面的滑桿實驗。",
+   "<b>step 5</b>：加權求和的對象換成 <b>values</b>。至此 GPT 用的單頭注意力已經完整：x → q/k/v → 分數 → ÷√d_k → softmax → 加權 value。對六個 token 同時做＝三次矩陣乘法。"];
+  $("#qkCap").innerHTML=caps[qkStep];
+  $("#qkDots").innerHTML=Array.from({length:QK_STEPS},(_,i)=>`<span class="dot2 ${i===qkStep?'on':''}"></span>`).join("");
+  $("#qkPrev").disabled=qkStep===0;$("#qkNext").disabled=qkStep===QK_STEPS-1;
+}
+$("#qkNext").addEventListener("click",()=>{if(qkStep<QK_STEPS-1){qkStep++;renderQK();}});
+$("#qkPrev").addEventListener("click",()=>{if(qkStep>0){qkStep--;renderQK();}});
+renderQK();
+
+/* ===== 3.4 √d_k 滑桿 ===== */
+function renderDK(){
+  const exp=+$("#dkSlider").value,dk=Math.pow(2,exp);
+  $("#dkVal").textContent=dk;
+  const raw=TS2.map(v=>v*Math.sqrt(dk/2));
+  const wNo=softmax(raw),wYes=softmax(raw.map(v=>v/Math.sqrt(dk)));
+  const rows=w=>{const amx=w.indexOf(Math.max(...w));
+    return w.map((v,j)=>`<div class="pbrow ${j===amx?'amx':''}"><span>${TOKS[j]}</span><div class="barwrap"><div class="bar" style="width:${Math.max(0.5,v*100)}%"></div></div><span class="cnum">${(v*100).toFixed(1)}%</span></div>`).join("");};
+  $("#dkL").innerHTML=rows(wNo);$("#dkR").innerHTML=rows(wYes);
+  const peak=Math.max(...wNo)*100;
+  $("#dkCap").innerHTML=dk<=4
+   ?`d_k=${dk}：維度還小，兩邊差異不大。往右拉，看「不縮放」那邊發生什麼事。`
+   :dk<64?`d_k=${dk}：未縮放的最高權重已衝到 <b>${peak.toFixed(1)}%</b>，分佈開始向 one-hot 塌陷；縮放版穩穩維持原分佈（journey 22.6%）。`
+   :`d_k=${dk}：未縮放的分佈幾乎塌成 one-hot（峰值 <b>${peak.toFixed(1)}%</b>）——softmax 進入飽和區，<b>梯度趨近 0、訓練停滯</b>。GPT 級模型的維度動輒上千，不除以 √d_k 根本練不動；除了之後，分佈與梯度都維持在健康範圍。`;
+}
+$("#dkSlider").addEventListener("input",renderDK);
+renderDK();
+
+/* ===== 3.5 causal 兩做法 ===== */
+let cmMethod=0,cmStep=0;
+const MSK=CW.map((row,i)=>row.map((v,j)=>j<=i?v:0));
+function cmTable(M,kind){
+  let t=`<tr><th>Q＼K</th>`+TOKS.map(k=>`<th>${k}</th>`).join("")+`<th>Σ 列和</th></tr>`;
+  M.forEach((row,i)=>{
+    let sum=0;
+    t+=`<tr><th>${TOKS[i]}</th>`;
+    row.forEach((v,j)=>{
+      if(kind==="s"&&v===null){t+=`<td class="blk">-inf</td>`;return;}
+      if(kind!=="s")sum+=v;
+      if(kind!=="s"&&j>i){t+=`<td class="${kind==='m'?'drop0':'dim'}">${f4(0)}</td>`;return;}
+      const pct=Math.round(Math.min(1,Math.abs(v))*(kind==="s"?60:88));
+      t+=`<td style="background:color-mix(in srgb,var(--accent) ${pct}%,var(--surface-2));color:${Math.abs(v)>0.55?'#2a0818':'var(--muted)'}">${f4(v)}</td>`;
+    });
+    t+=kind==="s"?`<td class="dim">—</td>`:`<td style="color:${Math.abs(sum-1)<0.001?'var(--ok)':'var(--bad)'};font-weight:700">${sum.toFixed(2)}</td>`;
+    t+=`</tr>`;
+  });
+  return t;
+}
+function renderCM(){
+  const stepsA=[["w",CW],["m",MSK],["n",CNORM]],stepsB=[["s",SCM],["n",CNORM]];
+  const steps=cmMethod===0?stepsA:stepsB;
+  cmStep=Math.min(cmStep,steps.length-1);
+  const [kind,M]=steps[cmStep];
+  $("#cmTable").innerHTML=cmTable(M,kind);
+  const capsA=[
+   "<b>A-①</b>：先照常 softmax——每列總和 1（綠字）✓，但上三角（未來位置）也分到了權重：journey 那列有 66% 的注意力流向它不該看到的字。",
+   "<b>A-②</b>：乘上 torch.tril（下三角全 1 的 0/1 遮罩），上三角歸零。新問題出現：<b>列和不再是 1</b>（紅字）——比例被破壞了。",
+   "<b>A-③</b>：每列除以自己的列和，重新正規化 → 完成。可行，但花了三步，還先算了一次「含未來」的 softmax。"];
+  const capsB=[
+   "<b>B-①</b>：跳過中間商——直接在「分數」階段用 torch.triu + masked_fill 把上三角填 <b>−inf</b>（斜紋格）。注意這是 softmax <b>之前</b>的原始分數。",
+   "<b>B-②</b>：softmax(÷√d_k) 一步到位：e^−∞ → 0，被遮位置<b>精確為 0</b>、其餘自動分配到總和 1。對照做法 A 第③步——<b>數值一模一樣</b>，但少一步、更穩。"];
+  $("#cmCap").innerHTML=(cmMethod===0?capsA:capsB)[cmStep];
+  $("#cmDots").innerHTML=Array.from({length:steps.length},(_,i)=>`<span class="dot2 ${i===cmStep?'on':''}"></span>`).join("");
+  $("#cmPrev").disabled=cmStep===0;$("#cmNext").disabled=cmStep===steps.length-1;
+}
+$$("#cmSeg button").forEach(b=>b.addEventListener("click",()=>{$$("#cmSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");cmMethod=+b.dataset.m;cmStep=0;renderCM();}));
+$("#cmNext").addEventListener("click",()=>{cmStep++;renderCM();});
+$("#cmPrev").addEventListener("click",()=>{cmStep--;renderCM();});
+renderCM();
+/* ===== 3.5 dropout 模擬 ===== */
+let drSeed=42;
+function renderDR(){
+  const p=parseFloat($("#drSlider").value);$("#drVal").textContent=p.toFixed(2);
+  const R=mulberry32(drSeed);
+  let dropped=0;
+  let t=`<tr><th>Q＼K</th>`+TOKS.map(k=>`<th>${k}</th>`).join("")+`</tr>`;
+  for(let i=0;i<6;i++){
+    t+=`<tr><th>${TOKS[i]}</th>`;
+    for(let j=0;j<6;j++){
+      if(j>i){t+=`<td class="blk">✕</td>`;continue;}
+      if(R()<p){dropped++;t+=`<td class="drop0">0</td>`;}
+      else{const v=CNORM[i][j]/(1-p);t+=`<td style="color:var(--accent);font-weight:600">${v.toFixed(2)}</td>`;}
+    }
+    t+=`</tr>`;
+  }
+  $("#drTable").innerHTML=t;
+  $("#drCap").innerHTML=`p=${p.toFixed(2)}：21 個可見權重（causal 下三角）丟掉了 <b>${dropped}</b> 個；倖存值 ×1/(1−p)＝<b>${(1/(1-p)).toFixed(2)} 倍</b>補償，讓每列的期望值和沒 dropout 時一致。${Math.abs(p-0.5)<0.001?"p=0.5 是書中的教學示範值——對照下方 torch 真實輸出（遮罩位置不同純因 RNG 不同）。":"實際訓練 GPT 常用 0.1–0.2。"}`;
+}
+$("#drSlider").addEventListener("input",renderDR);
+$("#drBtn").addEventListener("click",()=>{drSeed=(drSeed*7+13)%100000;renderDR();});
+renderDR();
+
+/* ===== 3.5 CausalAttention codelines ===== */
+const CA=[
+ ["class CausalAttention(nn.Module):",null],
+ ["    def __init__(self, d_in, d_out, context_length, dropout, qkv_bias=False):","比 SelfAttention_v2 多收 context_length（mask 的邊長）和 dropout（比率）。qkv_bias 預設關——ch5 載 GPT-2 權重時才打開。"],
+ ["        self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)   # W_key/W_value 同","三個投影照舊，用 nn.Linear（v2 的作法：初始化較好）。"],
+ ["        self.dropout = nn.Dropout(dropout)","dropout 層：訓練時隨機丟權重＋自動 ×1/(1−p) 補償；model.eval() 時自動變成直通。"],
+ ["        self.register_buffer('mask', torch.triu(torch.ones(","register_buffer 註冊 mask：它不是可訓練參數、卻要跟著模型走——搬去 GPU 時（model.to(device)）buffer 會自動跟過去，不用手動管 device，避免 device mismatch 錯誤。"],
+ ["            context_length, context_length), diagonal=1))","torch.triu(..., diagonal=1)＝對角線『以上』為 1 的上三角——標出所有該遮的「未來」位置。"],
+ ["    def forward(self, x):",null],
+ ["        b, num_tokens, d_in = x.shape","輸入升級成三維 [batch, tokens, d_in]——第 2 章 data loader 吐出來的形狀。"],
+ ["        keys = self.W_key(x); queries = self.W_query(x); values = self.W_value(x)","三個投影一次算整個 batch：[b, T, d_in] → [b, T, d_out]。"],
+ ["        attn_scores = queries @ keys.transpose(1, 2)","關鍵細節：transpose(1, 2) 只轉「後兩維」、batch 維（0）不動——每個樣本各自算自己的 [T, T] 分數矩陣。"],
+ ["        attn_scores.masked_fill_(self.mask.bool()[:num_tokens, :num_tokens], -torch.inf)","做法 B 上場：上三角填 −inf。尾底線的 masked_fill_ 是 in-place 操作（省記憶體）；[:num_tokens, :num_tokens] 把 mask 裁到實際句長——句子比 context_length 短也能用。"],
+ ["        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)","÷√d_k 再 softmax——scaled dot-product 老規矩。"],
+ ["        attn_weights = self.dropout(attn_weights)","softmax 之後、加權求和之前套 dropout——書中選的是實務上較常見的位置。"],
+ ["        return attn_weights @ values","加權求和 → [b, T, d_out]。causal 單頭注意力完工。"]];
+$("#caLines").innerHTML=CA.map((c,i)=>`<div class="cl" data-i="${i}" style="cursor:${c[1]?'pointer':'default'}">${c[0].replace(/</g,"&lt;")}</div>`).join("");
+$$("#caLines .cl").forEach(el=>el.addEventListener("click",()=>{
+  const c=CA[+el.dataset.i];if(!c[1])return;
+  $$("#caLines .cl").forEach(x=>x.classList.remove("lit"));el.classList.add("lit");
+  $("#caCap").innerHTML="<b>"+c[0].trim().slice(0,52)+(c[0].trim().length>52?"…":"")+"</b> — "+c[1];
+}));
+
+/* ===== 3.6 wrapper 輸出（雙頭著色）===== */
+$("#wrTsr").innerHTML=`<span class="lbl"># MultiHeadAttentionWrapper(d_in=3, d_out=2, num_heads=2)（seed 123）——書中真實輸出（取第 1 個 batch）</span>\n`+
+ WRAP.map((r,i)=>`<span class="pn">${i===0?'tensor([[':'        ['}</span>`+r.map((v,c)=>`<span style="color:${c<2?'var(--accent)':'var(--cool)'};font-weight:600">${f4(v).padStart(7)}</span>`).join('<span class="pn">, </span>')+`<span class="pn">${i===5?']])':'],'}</span>   <span class="lbl"># ${TOKS[i]}</span>`).join("\n")+
+ `\n<span class="lbl">          └─ head 1 的 2 維 ─┘   └─ head 2 的 2 維 ─┘      整體 shape [2, 6, 4]＝[batch, tokens, d_out×num_heads]</span>`;
+
+/* ===== 3.6 head 切分 ===== */
+const MH_D=768,MH_B=2,MH_T=6;
+let mhH=12;
+function renderMH(){
+  $$("#mhPills .pill").forEach(b=>b.classList.toggle("on",+b.dataset.h===mhH));
+  const hd=MH_D/mhH;
+  $("#mhBar").innerHTML=Array.from({length:mhH},(_,i)=>`<div class="hseg">${mhH>6?`h${i+1}·${hd}`:`head ${i+1} · ${hd} 維`}</div>`).join("");
+  $("#mhTsr").innerHTML=`<span class="lbl"># d_out=${MH_D}, num_heads=${mhH} → head_dim = ${MH_D}/${mhH} = ${hd}（assert d_out % num_heads == 0）</span>
+輸入 x                     [${MH_B}, ${MH_T}, ${MH_D}]        <span class="lbl"># [batch, tokens, d_in]</span>
+W_q/W_k/W_v 各投影一次      [${MH_B}, ${MH_T}, ${MH_D}]        <span class="lbl"># 一次大矩陣乘法（不是 ${mhH} 次小的）</span>
+.view                      [${MH_B}, ${MH_T}, ${mhH}, ${hd}]${" ".repeat(Math.max(1,8-String(mhH).length-String(hd).length))}<span class="lbl"># 「切」出 head 維——免費，只是重新解讀記憶體</span>
+.transpose(1, 2)           [${MH_B}, ${mhH}, ${MH_T}, ${hd}]${" ".repeat(Math.max(1,8-String(mhH).length-String(hd).length))}<span class="lbl"># head 提前，讓批次矩陣乘法逐頭進行</span>
+q @ kᵀ → mask → softmax    [${MH_B}, ${mhH}, ${MH_T}, ${MH_T}]       <span class="lbl"># ${mhH} 張 ${MH_T}×${MH_T} 注意力矩陣，一次算完</span>
+@ values → 轉回、攤平       [${MH_B}, ${MH_T}, ${MH_D}]        <span class="lbl"># 串接所有 head，交給 out_proj</span>
+
+參數量 W_q+W_k+W_v = 3 × ${MH_D}×${MH_D} = <span style="color:var(--accent);font-weight:700">1,769,472</span>   <span class="lbl"># 與 num_heads 完全無關！</span>`;
+  $("#mhCap").innerHTML=mhH===1
+   ?`<b>1 頭</b>＝退化回 CausalAttention：一組 768 維的注意力。頭數是把同一塊 d_out「切」出來的，不是「加」出來的——所以參數量永遠不變。`
+   :mhH===12?`<b>12 頭 × 64 維＝GPT-2 124M 的實際設定</b>。每頭在自己的 64 維子空間學不同的注意模式（語法、指代、位置…），參數量和 1 頭時一模一樣——這呼應 ch4 會再看到的結論：<b>頭數不影響參數量</b>。`
+   :`<b>${mhH} 頭</b>：768 維被切成 ${mhH} 份、每頭 ${hd} 維。切法只影響「注意力矩陣有幾張」（${mhH} 張），三個投影矩陣的大小完全不變。`;
+}
+$$("#mhPills .pill").forEach(b=>b.addEventListener("click",()=>{mhH=+b.dataset.h;renderMH();}));
+renderMH();
+
+/* ===== quiz ===== */
+const quiz=[
+ {q:"簡化版 self-attention 中，journey 對其他 token 的 attention scores 是怎麼算的？",o:["兩個 embedding 的距離","query 的 embedding 和每個 token 的 embedding 做點積","隨機初始化","查表"],a:1,e:"ω₂ⱼ = x² · xʲ。點積衡量向量的對齊程度——愈相似分數愈高，例如 journey·starts = 1.4754 遠高於 journey·one = 0.7070。"},
+ {q:"為什麼實務上用 softmax 正規化，而不是「每個分數除以總和」？",o:["softmax 算得比較快","習慣問題，兩者完全等價","softmax 輸出恆為正、對極端值更穩、梯度性質利於訓練","除以總和是錯的"],a:2,e:"除以總和也能讓總和為 1（書中先示範它），但分數為負時會出問題、極端值下也不穩。softmax 先過指數：恆正、可解讀為機率、訓練性質好。"},
+ {q:"可訓練版（3.4）比簡化版（3.3）多了什麼？",o:["多了一層 softmax","點積前先讓 x 過 W_q/W_k/W_v 三個可訓練投影，讓「相似度的標準」可以被學出來","把點積換成加法","多了位置編碼"],a:1,e:"簡化版的相似度被 embedding 寫死；加上三個投影矩陣後，模型能在訓練中學會「該用什麼標準衡量相關性」。這三個 W 是注意力模組唯一的權重參數。"},
+ {q:"scaled dot-product attention 為什麼要除以 √d_k？",o:["讓數字比較好看","避免維度大時點積過大、softmax 飽和成 one-hot、梯度趨近 0","減少參數量","加速矩陣乘法"],a:1,e:"d_k 愈大點積天然愈大，大分數讓 softmax 進入飽和區、梯度消失、訓練停滯。除以 √d_k 把分數變異數拉回原尺度——這也是「scaled」一字的由來。"},
+ {q:"causal mask 的標準做法是？",o:["softmax 後把上三角歸零就好，不用再處理","把注意力矩陣整列刪掉","在分數階段把上三角填 −inf，再做 softmax","把未來 token 的 embedding 設為 0"],a:2,e:"−inf 經 softmax 後精確為 0，其餘位置自動歸一，一步到位。先 softmax 再歸零＋重新正規化在數學上等價，但多一步；−inf 這招 ch5 的 top-k sampling 還會再用。"},
+ {q:"dropout 率 0.5 時，為什麼倖存的權重要乘 2？",o:["彌補精度損失","讓最大值更突出","1/(1−p)=2 的補償讓整體期望值不變，訓練／推論的量級才一致","PyTorch 的 bug"],a:2,e:"隨機丟掉一半，剩下的 ×1/(1−0.5)=2，每列的期望總和維持不變。另外記得：dropout 只在訓練時啟用，推論時（model.eval()）自動關閉。"},
+ {q:"MultiHeadAttention 裡把 d_out=768 從 1 頭改成 12 頭，W_q/W_k/W_v 的參數量會？",o:["變成 12 倍","變成 1/12","完全不變——頭是用 view/transpose「切」出來的，投影矩陣大小不動","多出 out_proj 的參數"],a:2,e:"三個投影永遠是 768×768；num_heads 只決定投影結果被切成幾份（head_dim=768/12=64）、產生幾張注意力矩陣。所以 12 頭和 1 頭的參數量一模一樣。"}];
+const qc=$("#quizBox");let ans=0,cor=0;
+quiz.forEach((it,qi)=>{const w=document.createElement("div");w.className="q";w.innerHTML=`<div class="qn">Q${qi+1} / ${quiz.length}</div><div class="qt">${it.q}</div>`;
+ it.o.forEach((o,oi)=>{const b=document.createElement("button");b.className="opt";b.innerHTML=o+'<span class="mk"></span>';
+  b.addEventListener("click",()=>{if(w.dataset.done)return;w.dataset.done=1;ans++;const ok=oi===it.a;if(ok)cor++;b.classList.add(ok?"correct":"wrong");b.querySelector(".mk").textContent=ok?"✓":"✗";if(!ok){const cb=w.querySelectorAll(".opt")[it.a];cb.classList.add("correct");cb.querySelector(".mk").textContent="✓";}w.querySelector(".exp").classList.add("show");if(ans===quiz.length)$("#score").textContent=`完成 ✓ 答對 ${cor} / ${quiz.length} 題`;});
+  w.appendChild(b);});
+ const ex=document.createElement("div");ex.className="exp";ex.textContent="▸ "+it.e;w.appendChild(ex);qc.appendChild(w);});
+})();
+</script>
+</body>
+</html>

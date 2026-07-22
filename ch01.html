@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ch1 理解大型語言模型｜互動教材</title>
+<style>
+:root{
+  --accent:#3f72af;--accent-soft:#6a97cf;--accent-ghost:rgba(63,114,175,.12);
+  --bg:#e7ebf0;--grid:rgba(20,30,45,.05);--surface:#f4f7fa;--surface-2:#e6ecf2;
+  --ink:#111a26;--muted:#54606f;--faint:#8790a0;
+  --line:rgba(20,30,45,.14);--line-strong:rgba(20,30,45,.28);
+  --ok:#3f8a52;--bad:#c0492f;--cool:#c1791f;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"PingFang TC","Noto Sans TC","Segoe UI",sans-serif;
+  --maxw:1220px;--read:68ch;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0a0e15;--grid:rgba(111,158,222,.06);--surface:#111823;--surface-2:#18212e;
+  --ink:#dfe7f1;--muted:#93a1b4;--faint:#5e6a7b;--line:rgba(216,230,247,.13);--line-strong:rgba(216,230,247,.26);
+  --accent:#6f9ede;--accent-soft:#8fb4e8;--accent-ghost:rgba(111,158,222,.16);--ok:#5faf70;--bad:#e2694f;--cool:#e0a63a;}}
+:root[data-theme="light"]{--bg:#e7ebf0;--grid:rgba(20,30,45,.05);--surface:#f4f7fa;--surface-2:#e6ecf2;--ink:#111a26;--muted:#54606f;--faint:#8790a0;--line:rgba(20,30,45,.14);--line-strong:rgba(20,30,45,.28);--accent:#3f72af;--accent-soft:#6a97cf;--accent-ghost:rgba(63,114,175,.12);--ok:#3f8a52;--bad:#c0492f;--cool:#c1791f;}
+:root[data-theme="dark"]{--bg:#0a0e15;--grid:rgba(111,158,222,.06);--surface:#111823;--surface-2:#18212e;--ink:#dfe7f1;--muted:#93a1b4;--faint:#5e6a7b;--line:rgba(216,230,247,.13);--line-strong:rgba(216,230,247,.26);--accent:#6f9ede;--accent-soft:#8fb4e8;--accent-ghost:rgba(111,158,222,.16);--ok:#5faf70;--bad:#e2694f;--cool:#e0a63a;}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.68;-webkit-font-smoothing:antialiased;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:30px 30px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+a{color:var(--accent)}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:70;transition:width .1s}
+header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 88%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:52px}
+.brand{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px}.brand b{color:var(--ink)}
+.chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--accent);color:var(--accent);border-radius:2px}
+.spacer{flex:1}.tbtn{font-family:var(--mono);font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:3px;padding:5px 10px;cursor:pointer}.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+/* 全書管線圖 */
+.map{position:sticky;top:52px;z-index:49;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:8px 0 6px}
+.map .wrap{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:none}
+.map .wrap::-webkit-scrollbar{display:none}
+.mapstage{flex:none;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);cursor:pointer;transition:.25s;white-space:nowrap}
+.mapstage .em{font-size:12px}
+.mapstage:hover{border-color:var(--accent-soft)}
+.mapstage.lit{background:var(--accent);color:#061a2e;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ghost)}
+.mapsep{flex:none;color:var(--faint);padding:0 2px;font-size:11px}
+.mapsub{font-family:var(--mono);font-size:11px;color:var(--accent);padding:3px 0 0;min-height:16px}
+.mapsub b{color:var(--ink)}
+@media(max-width:700px){.mapstage{font-size:10px;padding:4px 7px}}
+/* layout */
+.shell{display:grid;grid-template-columns:186px minmax(0,1fr);gap:40px;padding-top:28px}
+@media(max-width:960px){.shell{grid-template-columns:1fr;gap:0}}
+nav.toc{position:sticky;top:118px;align-self:start;font-family:var(--mono);font-size:12px;max-height:calc(100vh - 140px);overflow:auto}
+@media(max-width:960px){nav.toc{display:none}}
+nav.toc .lbl{color:var(--faint);letter-spacing:.14em;font-size:10px;text-transform:uppercase;margin-bottom:10px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--ink);border-color:var(--line-strong)}nav.toc a.active{color:var(--accent);border-color:var(--accent)}
+main{min-width:0}
+.hero{padding:6px 0 26px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(26px,4.6vw,42px);line-height:1.06;margin:0;letter-spacing:-.01em}
+h1 .sub{display:block;font-size:clamp(14px,2.2vw,18px);color:var(--muted);font-weight:500;margin-top:10px}
+.lede{font-size:16px;color:var(--muted);max-width:var(--read);margin:16px 0 0}
+section{padding:38px 0;border-bottom:1px solid var(--line);scroll-margin-top:132px}
+.sh{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;flex-wrap:wrap}
+.sh .num{font-family:var(--mono);color:var(--accent);font-size:13px;font-weight:600}
+h2{font-family:var(--mono);font-weight:600;font-size:clamp(18px,2.8vw,24px);margin:0;letter-spacing:-.01em}
+h3{font-family:var(--mono);font-size:15px;margin:28px 0 8px;font-weight:600;color:var(--ink)}
+p{max-width:var(--read);margin:12px 0;color:var(--muted)}p strong,li strong{color:var(--ink)}
+.en{font-family:var(--mono);font-size:.92em;color:var(--accent);font-weight:600}
+ul.clean{max-width:var(--read);padding-left:0;list-style:none;margin:14px 0}ul.clean li{position:relative;padding-left:20px;margin:8px 0;color:var(--muted)}
+ul.clean li::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+.plain{max-width:var(--read);background:var(--accent-ghost);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 16px;margin:16px 0;font-size:14.5px;color:var(--ink)}
+.plain .ph{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent);font-weight:700;margin-bottom:5px}
+.plain p{margin:6px 0 0;color:var(--ink);max-width:none}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.small{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+canvas{display:block;width:100%;height:auto}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:14px 0}
+pre .c{color:var(--faint)}pre .k{color:var(--accent)}
+code.inl{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:var(--ink)}
+.btn{font-family:var(--mono);font-size:12.5px;padding:8px 15px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#061a2e;cursor:pointer;font-weight:600}
+.btn.ghost{background:none;color:var(--accent)}.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font-family:var(--mono);font-size:12px;padding:7px 12px;background:var(--surface-2);border:none;border-right:1px solid var(--line);cursor:pointer;color:var(--muted)}
+.seg button:last-child{border-right:none}.seg button.on{background:var(--accent);color:#061a2e}
+.pill{font-family:var(--mono);font-size:12px;padding:6px 11px;border:1px solid var(--line);background:var(--surface-2);border-radius:20px;cursor:pointer;color:var(--muted)}
+.pill:hover{border-color:var(--accent);color:var(--accent)}.pill.on{background:var(--accent);color:#061a2e;border-color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+input[type=range]{-webkit-appearance:none;height:4px;border-radius:3px;background:var(--surface-2);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+/* 等寬數值區塊 */
+.tsr{font-family:var(--mono);font-size:12.5px;line-height:1.9;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.tsr .pn{color:var(--faint)}
+.tsr .lbl{color:var(--faint);font-size:11px}
+.tn{display:inline-block;padding:0 5px;border-radius:5px;transition:.12s;cursor:default}
+.tn:hover,.tn.hot{background:var(--accent);color:#061a2e!important}
+.tn.dimmed{opacity:.35}
+.tn.neg{color:var(--cool)}
+.tn0{display:inline-block;border-radius:5px;transition:.12s;cursor:default}
+.tn0.hot{background:var(--accent);color:#061a2e}
+.tsrnote{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-height:18px;margin-top:8px}
+.tsrnote b{color:var(--ink)}
+/* 積木進度（本章 7 個重點） */
+.bricks{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin:14px 0}
+.brick{font-family:var(--mono);font-size:11.5px;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--muted);cursor:pointer;transition:.25s;display:flex;gap:8px;align-items:flex-start}
+.brick .ck{width:16px;height:16px;flex:none;border:1.5px solid var(--line-strong);border-radius:4px;display:grid;place-items:center;font-size:10px;color:#fff;margin-top:1px}
+.brick.done{border-color:var(--ok);color:var(--ink)}.brick.done .ck{background:var(--ok);border-color:var(--ok)}
+.brick.now{border-color:var(--accent);background:var(--accent-ghost);color:var(--ink);box-shadow:0 0 0 3px var(--accent-ghost)}
+.brick.now .ck{border-color:var(--accent);color:var(--accent)}
+/* 句子 chips */
+.sent{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+.wchip{font-family:var(--mono);font-size:13.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);cursor:default;transition:.12s}
+.wchip.hot{background:var(--accent);color:#061a2e;border-color:var(--accent)}
+.wchip small{display:block;font-size:9.5px;color:var(--faint);text-align:center}
+.wchip.hot small{color:#061a2e}
+.wchip.dim{opacity:.3}
+/* stepper 共用 */
+.stepbar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.dots{display:flex;gap:6px;align-items:center;margin-left:auto}
+.dot2{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}.dot2.on{background:var(--accent)}
+.stepcap{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--accent-ghost);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;padding:11px 14px;margin-top:12px;min-height:42px}
+.stepcap b{color:var(--accent)}
+/* code-line stepper */
+.codelines{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 0;overflow-x:auto}
+.cl{padding:3px 16px;white-space:pre;color:var(--muted);border-left:3px solid transparent;transition:.2s}
+.cl.lit{background:var(--accent-ghost);border-left-color:var(--accent);color:var(--ink)}
+.cl .cm{color:var(--faint)}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--accent-ghost);border-radius:0 8px 8px 0;padding:12px 15px;margin:16px 0;max-width:var(--read);font-size:14px;color:var(--muted)}.note b{color:var(--accent)}
+/* 機率長條 */
+.pbrow{display:grid;grid-template-columns:76px 1fr 150px;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;margin:5px 0;color:var(--muted)}
+.pbrow .barwrap{background:var(--surface-2);border-radius:3px;height:16px;overflow:hidden}
+.pbrow .bar{height:100%;background:var(--accent);opacity:.8;transition:width .25s}
+.pbrow.amx{color:var(--ink);font-weight:600}.pbrow.amx .bar{opacity:1}
+.pbrow.zero .bar{background:var(--line-strong)}
+.pbrow .cnum{font-variant-numeric:tabular-nums}
+/* io 卡 */
+.iocard{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin:12px 0 6px;overflow-x:auto;padding-bottom:2px}
+.iocard .io{display:flex;flex-direction:column;justify-content:center;text-align:center;padding:8px 12px;border-radius:8px;line-height:1.5;flex:none}
+.iocard .in,.iocard .out{border:1.5px dashed var(--line-strong);color:var(--muted);background:var(--surface)}
+.iocard .out{border-color:var(--accent-soft)}
+.iocard .box{border:1.5px solid var(--accent);background:var(--accent-ghost);color:var(--ink);font-weight:600}
+.iocard .box small{display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px}
+.iocard .ioarrow{align-self:center;color:var(--faint);flex:none}
+.iocard.clickable .io{cursor:pointer;transition:.2s}
+.iocard.clickable .io:hover{border-color:var(--accent-soft)}
+.iocard .io.pick{border:1.5px solid var(--accent);background:var(--accent-ghost);color:var(--ink);font-weight:600;box-shadow:0 0 0 3px var(--accent-ghost)}
+/* AI 圈層 SVG */
+.aisvg{width:100%;max-width:700px;height:auto;display:block}
+.aisvg .lay{cursor:pointer}
+.aisvg .lay rect{fill:var(--surface);fill-opacity:.55;stroke:var(--line-strong);stroke-width:1.4;transition:.2s}
+.aisvg .lay:hover rect{stroke:var(--accent-soft)}
+.aisvg .lay.on rect{fill:var(--accent-ghost);fill-opacity:1;stroke:var(--accent);stroke-width:2}
+.aisvg text{font-family:var(--mono);font-size:12px;font-weight:600;fill:var(--muted);pointer-events:none}
+.aisvg .lay.on text{fill:var(--accent)}
+.aisvg .sub2{font-size:10.5px;font-weight:400}
+/* transformer SVG */
+.tfsvg{width:100%;height:auto;display:block}
+.tfsvg .blk rect{stroke-width:1.6;transition:.25s}
+.tfsvg .enc rect{fill:color-mix(in srgb,var(--cool) 14%,transparent);stroke:var(--cool)}
+.tfsvg .dec rect{fill:var(--accent-ghost);stroke:var(--accent)}
+.tfsvg .blk.off{opacity:.16}
+.tfsvg text{font-family:var(--mono)}
+.tfsvg .bt{fill:var(--ink);font-weight:700;font-size:15px}
+.tfsvg .bs{fill:var(--muted);font-size:10.5px}
+.tfsvg .tok{fill:var(--muted);font-size:11.5px}
+.tfsvg .tokhl{fill:var(--accent);font-weight:700}
+.tfsvg .mask{fill:var(--cool);font-weight:700}
+.tfsvg .fl{stroke:var(--accent);stroke-width:2;fill:none}
+/* quiz */
+.quiz .q{margin:18px 0}.quiz .qn{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:7px}.quiz .qt{font-weight:600;color:var(--ink);max-width:var(--read);margin-bottom:9px}
+.opt{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 14px;margin:6px 0;cursor:pointer;font-family:var(--sans);font-size:14px;color:var(--ink);max-width:var(--read)}
+.opt:hover{border-color:var(--accent)}.opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.opt .mk{float:right;font-family:var(--mono);font-weight:700}.opt.correct .mk{color:var(--ok)}.opt.wrong .mk{color:var(--bad)}
+.exp{max-width:var(--read);font-size:13px;color:var(--muted);padding:9px 14px;border-left:2px solid var(--accent);margin:5px 0 0;display:none}.exp.show{display:block}
+.foot{font-family:var(--mono);font-size:11px;color:var(--faint);padding:28px 0 70px;text-align:center;line-height:1.9}
+kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<header class="top"><div class="wrap">
+  <div class="brand"><span class="chip">CH·1</span><b><a href="index.html" style="color:inherit;text-decoration:none">從零打造 LLM</a></b><span style="color:var(--faint)">/ 理解大型語言模型</span></div>
+  <div class="spacer"></div><button class="tbtn" id="themeBtn">◐ 主題</button>
+</div></header>
+
+<div class="map">
+  <div class="wrap" id="mapRow"></div>
+  <div class="wrap"><div class="mapsub" id="mapSub"></div></div>
+</div>
+
+<div class="wrap"><div class="shell">
+  <nav class="toc" aria-label="章節導覽">
+    <div class="lbl">Chapter 1</div>
+    <a href="#sec-intro">本章定位 · 全書地圖</a>
+    <a href="#sec-11">1.1 什麼是 LLM</a>
+    <a href="#sec-12">1.2 應用場景</a>
+    <a href="#sec-13">1.3 預訓練 → 微調</a>
+    <a href="#sec-14">1.4 Transformer</a>
+    <a href="#sec-15">1.5 大資料規模</a>
+    <a href="#sec-16">1.6 GPT 架構</a>
+    <a href="#sec-17">1.7 三階段藍圖</a>
+    <a href="#sec-sum">本章小結</a>
+    <a href="#sec-quiz">✓ 知識檢核</a>
+  </nav>
+
+  <main>
+    <div class="hero" id="top">
+      <p class="eyebrow">Build a Large Language Model (From Scratch) · Chapter 1</p>
+      <h1>理解大型語言模型<span class="sub">Understanding large language models</span></h1>
+      <p class="lede">在寫下任何一行程式之前，先把地圖攤開：LLM 到底是什麼？為什麼「預測下一個字」這麼樸素的任務，能長出 ChatGPT 這種等級的能力？<span class="en">transformer</span>、<span class="en">GPT</span>、預訓練、微調這些詞又是怎麼串在一起的？這一章沒有程式碼——它負責把整本書要走的路一次看清楚。頁面中的關鍵數字（175B 參數、$4.6M、3,000 億 token⋯）皆取自書中。</p>
+    </div>
+
+    <!-- ===== 本章定位 ===== -->
+    <section id="sec-intro" data-map="all">
+      <div class="sh"><span class="num">00</span><h2>本章定位：整本書的鳥瞰圖</h2></div>
+      <p>這是全書唯一「純概念」的一章：不寫程式，先建立正確的世界觀。之後每一章都是把本章的某一格放大實作：</p>
+      <div class="iocard">
+        <span class="io in">input：會寫 Python 的你<br>（不需要 ML 博士學位）</span><span class="ioarrow">→</span>
+        <span class="io box">本書：從零打造一個 GPT<small>STAGE 1 打地基（ch2–4）· STAGE 2 預訓練（ch5）· STAGE 3 微調（ch6–7）</small></span><span class="ioarrow">→</span>
+        <span class="io out">output：能分類、能對話的<br>自己親手寫出的 LLM</span>
+      </div>
+      <p>本章的 7 個重點——<strong>會隨你往下讀自動打勾</strong>（也可以點擊跳到該節）：</p>
+      <div class="bricks" id="bricks"></div>
+      <div class="plain"><div class="ph">🔰 先建立心態</div><p>先把 LLM 除魅：它不是魔法，本質是一個把「<strong>預測下一個字</strong>」練到極致的深度神經網路。本章你只需要帶走一句話：<b>簡單的訓練目標 × 巨大的規模 ＝ 看似神奇的能力</b>。之後六章，都是在把這句話一步步落實成程式碼。</p></div>
+      <h3>暖身：本章的三個天文數字</h3>
+      <p>「大型」語言模型的「大」不是形容詞，是可以量化的。先預告本章會反覆出現的三個數字（1.5 節有互動換算器）：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># 以 GPT-3 為例（書中數值）</span>
+參數量           <span class="tn" style="color:var(--accent);font-weight:700">175,000,000,000</span>（175B）    <span class="lbl"># 「large」的第一層意思：模型規模</span>
+預訓練 token 量  <span class="tn" style="color:var(--accent);font-weight:700">~300,000,000,000</span>（3,000 億） <span class="lbl"># 第二層意思：資料規模</span>
+預訓練成本估計   <span class="tn" style="color:var(--bad);font-weight:700">$4,600,000</span>（雲端算力）      <span class="lbl"># 為什麼第 5 章要「借」OpenAI 的權重</span></div></div>
+      <div class="note"><b>本章讀法：</b>每一節都對應上方 sticky 管線圖的一段——留意讀到哪一節時哪幾格亮起。讀完本章，你就把「📚 資料 → ✂️ Tokenize → ▦ Embedding → 🧱 架構 → 🏋️ 預訓練 → 🎯 微調 → 💬 應用」這條全書路線先走過一遍了。</div>
+    </section>
+
+    <!-- ===== 1.1 ===== -->
+    <section id="sec-11" data-map="m-arch,m-pre">
+      <div class="sh"><span class="num">1.1</span><h2>What is an LLM?（什麼是大型語言模型？）</h2></div>
+      <div class="iocard"><span class="io in">input：一串文字（前文）</span><span class="ioarrow">→</span><span class="io box">LLM：深度神經網路<small>transformer 架構 · 數百億個可調權重</small></span><span class="ioarrow">→</span><span class="io out">output：「下一個 token 是誰」<br>的機率分佈</span></div>
+      <p>一句話定義：LLM 是一個<strong>被設計來理解、生成並回應類人文字</strong>的深度神經網路，在極大量的文字資料上訓練——有時涵蓋公開網路的一大部分。「large」是雙關：<strong>參數規模</strong>（動輒數百億個訓練中不斷調整的權重）與<strong>資料規模</strong>都空前地大。</p>
+      <p>而它學的任務樸素得驚人：<span class="en">next-word prediction</span>——給前文、猜下一個字。這個任務刻意利用了語言天生的<strong>序列性</strong>，逼模型學會文字裡的脈絡、結構與關係。任務如此簡單、模型卻如此能幹，連許多研究者都感到意外——1.6 會回來拆解這件事。</p>
+      <div class="plain"><div class="ph">🔰「理解」的免責聲明</div><p>本書說 LLM「理解」語言，指的是它<b>能生成連貫、切題的文字</b>，不代表它擁有人類式的意識或理解。另外，因為 LLM 會「生成」，它也被歸類為<span class="en">generative AI（GenAI）</span>的一種。</p></div>
+      <h3>LLM 住在 AI 版圖的哪裡？</h3>
+      <p><strong>點擊圈層</strong>（或下方按鈕），看每一層是什麼。重點：LLM 不是横空出世的新物種，它是 AI ⊃ ML ⊃ DL 這條演化路線的最內圈：</p>
+      <div class="stage">
+        <svg class="aisvg" viewBox="0 0 680 320" role="img" aria-label="AI、ML、DL、LLM 圈層關係圖">
+          <g class="lay" data-l="ai"><rect x="8" y="8" width="664" height="304" rx="18"/><text x="28" y="296">Artificial Intelligence · 人工智慧</text></g>
+          <g class="lay" data-l="ml"><rect x="40" y="44" width="600" height="228" rx="16"/><text x="60" y="256">Machine Learning · 機器學習</text></g>
+          <g class="lay" data-l="dl"><rect x="72" y="80" width="440" height="156" rx="14"/><text x="92" y="220">Deep Learning · 深度學習</text></g>
+          <g class="lay" data-l="llm"><rect x="104" y="112" width="240" height="88" rx="12"/><text x="224" y="152" text-anchor="middle" style="font-size:15px">LLM</text><text class="sub2" x="224" y="174" text-anchor="middle">大型語言模型</text></g>
+          <g class="lay" data-l="gen"><rect x="392" y="112" width="150" height="88" rx="12"/><text x="467" y="152" text-anchor="middle" style="font-size:13px">GenAI</text><text class="sub2" x="467" y="174" text-anchor="middle">生成式 AI</text></g>
+        </svg>
+        <div class="controls" id="aiPills" style="margin:12px 0 0"></div>
+        <div class="stepcap" id="aiCap"></div>
+      </div>
+      <h3>「從資料學規則」是什麼意思：垃圾郵件過濾器</h3>
+      <p>書中用一個經典例子區分「機器學習」與「深度學習」——同樣是做 spam 分類，<strong>特徵是誰找的？切換對照：</strong></p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="spamSeg"><button data-m="0" class="on">傳統機器學習</button><button data-m="1">深度學習</button></span></div>
+        <div class="tsr" id="spamTsr"></div>
+        <div class="stepcap" id="spamCap"></div>
+      </div>
+      <div class="note"><b>把結論記成三句話：</b>① LLM＝把 next-word prediction 練到極致的深度神經網路；② large＝「參數 × 資料」兩個規模；③ 它屬於深度學習——特徵自己學、不靠人工設計，而它用的網路架構叫 <span class="en">transformer</span>（1.4 登場），能在預測時「選擇性注意」輸入的不同部分。</div>
+    </section>
+
+    <!-- ===== 1.2 ===== -->
+    <section id="sec-12" data-map="m-app">
+      <div class="sh"><span class="num">1.2</span><h2>Applications of LLMs（LLM 能拿來做什麼）</h2></div>
+      <div class="iocard"><span class="io in">input：幾乎任何<br>「讀文字」的任務</span><span class="ioarrow">→</span><span class="io box">同一個 LLM<small>parsing ＋ generating text</small></span><span class="ioarrow">→</span><span class="io out">output：翻譯 / 分類 / 摘要<br>/ 程式碼 / 對話⋯</span></div>
+      <p>舊時代的 NLP 模型是「一個任務、一個模型」：分類器不會翻譯、翻譯器不會摘要。LLM 打破了這件事——<strong>一個模型、多樣任務</strong>。點一種應用看例子（例子為示意，任務分類依書中）：</p>
+      <div class="stage">
+        <div class="controls" id="appPills"></div>
+        <div class="tsr" id="appTsr"></div>
+        <div class="stepcap" id="appCap"></div>
+      </div>
+      <div class="note"><b>共同模式：</b>只要任務能描述成「文字進、文字出」（parsing and generating text），LLM 幾乎都排得上用場。這也是為什麼本書只教你打造「會生成文字的模型」——就足以理解 ChatGPT 全家是怎麼運作的。</div>
+    </section>
+
+    <!-- ===== 1.3 ===== -->
+    <section id="sec-13" data-map="m-data,m-pre,m-ft">
+      <div class="sh"><span class="num">1.3</span><h2>Stages of building and using LLMs（打造與使用 LLM 的階段）</h2></div>
+      <p>能用 ChatGPT，為什麼還要<strong>自己造一個</strong>？書中給的理由很實際：</p>
+      <ul class="clean">
+        <li><strong>理解機制與極限的最好方式</strong>：從零寫一遍，你才知道它哪裡強、哪裡會壞。這套知識也是預訓練／微調現成開源模型的必修課。</li>
+        <li><strong>客製模型可以贏過通用模型</strong>：為特定領域打造的 LLM——如金融的 <span class="en">BloombergGPT</span>、醫療問答模型——在自己的領域可勝過 ChatGPT 這類通才。</li>
+        <li><strong>隱私與自主</strong>：敏感資料不必交給第三方；小型客製模型還能直接跑在筆電、手機上（Apple 正在探索的方向），降低延遲與伺服器成本，更新節奏完全自己掌控。</li>
+      </ul>
+      <div class="note"><b>工具說明：</b>現今多數 LLM 用 <span class="en">PyTorch</span> 深度學習框架實作，本書也是（附錄 A 有 PyTorch 速成）。</div>
+      <h3>兩階段配方：pretraining → fine-tuning</h3>
+      <p>打造 LLM 的通用流程只有兩大步。「pre」的意思是「先」——先在大而雜的資料上訓練出通用語言能力，再精修。<strong>點流程中任一節點看說明：</strong></p>
+      <div class="stage">
+        <div class="iocard clickable" id="flowCard" style="margin:0 0 4px">
+          <span class="io in" data-f="raw">原始文字 raw text<br>網路 · 書 · Wikipedia（數兆詞）</span><span class="ioarrow">→</span>
+          <span class="io in" data-f="pre">預訓練 pretraining<br>next-word · 自監督</span><span class="ioarrow">→</span>
+          <span class="io in" data-f="found">基礎模型<br>foundation model</span><span class="ioarrow">→</span>
+          <span class="io in" data-f="ft">微調 fine-tuning<br>兩種口味</span>
+        </div>
+        <div class="stepcap" id="flowCap"></div>
+      </div>
+      <h3>自監督：標籤就藏在文字裡</h3>
+      <p>傳統監督式學習（回想 1.1 的垃圾郵件）要有人一筆筆標 label；但預訓練用的是 <span class="en">self-supervised learning</span>（自監督）——<strong>模型自己從資料裡生出標籤</strong>。滑過下面句子的任何一個字，看標籤是怎麼「免費」出現的：</p>
+      <div class="stage">
+        <div class="sent" id="ssChips"></div>
+        <div class="tsr" id="ssTsr"></div>
+        <div class="tsrnote" id="ssNote">滑過上面的句子或任一列試試 →</div>
+      </div>
+      <div class="plain"><div class="ph">🔰 為什麼「無標註」這麼革命性</div><p>傳統監督學習的瓶頸是<b>標註成本</b>——要雇人一筆筆標。而 next-word prediction 的標準答案<b>就是句子裡的下一個字</b>，「右移一格」就能自動生出標籤。於是整個網際網路瞬間變成現成教材，數兆詞的資料想用就用。這頁小互動是第 2 章（把「右移一格」寫成 data loader）與第 5 章（對著它算 loss）的預告片。</p></div>
+    </section>
+
+    <!-- ===== 1.4 ===== -->
+    <section id="sec-14" data-map="m-arch">
+      <div class="sh"><span class="num">1.4</span><h2>Introducing the transformer architecture（transformer 架構）</h2></div>
+      <div class="iocard"><span class="io in">input：2017 論文<br>"Attention Is All You Need"</span><span class="ioarrow">→</span><span class="io box">transformer＝encoder ＋ decoder<small>核心零件：self-attention（第 3 章手刻）</small></span><span class="ioarrow">→</span><span class="io out">output：兩條後代路線<br>BERT（encoder）／ GPT（decoder）</span></div>
+      <p>現代 LLM 幾乎都站在 <span class="en">transformer</span> 上。它出自 2017 年的論文《Attention Is All You Need》，原本是為<strong>機器翻譯</strong>設計的（英→德、英→法），由兩個子模組組成：<span class="en">encoder</span> 把輸入句子編碼成一串「捕捉了上下文資訊」的向量；<span class="en">decoder</span> 讀著這些向量，<strong>一次一個字</strong>地生成輸出。</p>
+      <p>靈魂零件是 <span class="en">self-attention</span>：讓序列中的 token <strong>彼此衡量重要性</strong>，模型因此能在預測時「選擇性注意」輸入的不同部分、抓住長距離的依賴關係。機制細節書中刻意先不展開——第 3 章會從零實作。<strong>切換三種形態對照：</strong></p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="tfSeg"><button data-m="orig" class="on">原始 transformer（翻譯）</button><button data-m="bert">BERT · encoder-only</button><button data-m="gpt">GPT · decoder-only</button></span></div>
+        <div id="tfWrap"></div>
+        <div class="stepcap" id="tfCap"></div>
+      </div>
+      <h3>不用重新訓練，就能換任務：zero-shot 與 few-shot</h3>
+      <p>GPT 這型模型雖然只被訓練來「接話」，卻展現出驚人的彈性——<strong>不改一根權重</strong>就能做各種新任務。用書中圖 1.6 的三個例子切換看：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="fsSeg"><button data-m="0" class="on">文字接龍</button><button data-m="1">zero-shot</button><button data-m="2">few-shot</button></span></div>
+        <div class="tsr" id="fsTsr"></div>
+        <div class="stepcap" id="fsCap"></div>
+      </div>
+      <div class="note"><b>名詞澄清（transformer ≠ LLM）：</b>不是所有 transformer 都是 LLM——transformer 也能做電腦視覺；也不是所有 LLM 都用 transformer——有基於 RNN、CNN 的路線（動機是計算效率，能否追上還待觀察）。本書中「LLM」一詞專指 GPT 這類 transformer-based 模型。</div>
+    </section>
+
+    <!-- ===== 1.5 ===== -->
+    <section id="sec-15" data-map="m-data,m-tok">
+      <div class="sh"><span class="num">1.5</span><h2>Utilizing large datasets（大資料到底有多大）</h2></div>
+      <div class="iocard"><span class="io in">input：表 1.1<br>GPT-3 的預訓練資料配方</span><span class="ioarrow">→</span><span class="io box">按比例抽樣混合<small>token＝模型閱讀的基本單位（第 2 章拆解）</small></span><span class="ioarrow">→</span><span class="io out">output：約 3,000 億 token<br>的訓練量</span></div>
+      <p>「大而多樣」的資料是 LLM 能力的另一半來源。書中表 1.1 列出 GPT-3（ChatGPT 初版的 base model）的預訓練資料配方。<strong>滑過長條</strong>看每個來源的細節，再<strong>切換視圖</strong>看一個有趣的落差：</p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="dsSeg"><button data-m="0" class="on">按抽樣比例（訓練權重）</button><button data-m="1">按資料量（token 數）</button></span></div>
+        <div id="dsRows"></div>
+        <div class="small" style="margin-top:8px">合計 499B tokens ｜ 實際訓練量 ~300B tokens</div>
+        <div class="stepcap" id="dsCap"></div>
+      </div>
+      <div class="note"><b>資料集哪裡來？</b>GPT-3 的原始訓練資料並未公開，但公開替代品存在——例如 <span class="en">Dolma</span>（3 兆 token 的開放語料庫，注意其中可能含受版權保護的內容）。後來的模型（如 Meta 的 LLaMA）還擴充了資料光譜：Arxiv 研究論文（92 GB）、StackExchange 程式問答（78 GB）。</div>
+      <h3>規模換算器：把天文數字變成體感</h3>
+      <p>3,000 億 token 是什麼概念？拖動閱讀速度滑桿感受一下（token 數約略等於「詞＋標點」的數量）：</p>
+      <div class="stage">
+        <div class="tsr" id="rdCards"><span class="lbl"># GPT-3 規模速覽（書中數值）</span>
+參數量        175B         <span class="lbl"># 1,750 億個可調權重</span>
+訓練 token    ~300B        <span class="lbl"># ≈ 3,000,000 本 300 頁的小說（每本約 10 萬 token）</span>
+預訓練成本    ~$4.6M       <span class="lbl"># 雲端算力估計</span>
+<span class="lbl"># 每個參數平均只分到 300B ÷ 175B ≈ 1.7 個 token 的訓練資料
+# 對照：第 5 章教學用的資料集只有 5,145 tokens——GPT-3 訓練量的 5,800 萬分之一</span></div>
+        <div class="controls" style="gap:14px;margin:12px 0 0">
+          <span class="small">你的閱讀速度 = <b id="rdVal" style="color:var(--accent)">250</b> tokens/分鐘</span>
+          <input type="range" id="rdSlider" min="100" max="500" step="10" value="250" style="flex:1;min-width:180px">
+        </div>
+        <div class="stepcap" id="rdOut"></div>
+      </div>
+      <div class="plain"><div class="ph">💰 好消息：這筆帳單你不用付</div><p>許多預訓練完成的權重已<b>開源</b>。本書的策略：第 5 章先用小資料集實作預訓練（把機制搞懂），然後<b>直接載入 OpenAI 公開的 GPT-2 權重</b>——第 6、7 章的微調在一般筆電上就跑得動。$4.6M 的帳單，就這樣繞過去。</p></div>
+    </section>
+
+    <!-- ===== 1.6 ===== -->
+    <section id="sec-16" data-map="m-arch,m-pre">
+      <div class="sh"><span class="num">1.6</span><h2>A closer look at the GPT architecture（GPT 架構）</h2></div>
+      <div class="iocard"><span class="io in">input：前文<br>"This is an"</span><span class="ioarrow">→</span><span class="io box">GPT＝只留 decoder<small>單向（左→右）· GPT-3 疊 96 層</small></span><span class="ioarrow">→</span><span class="io out">output：下一個字 "example"<br>→ 接回輸入，再來一輪 ↻</span></div>
+      <p>GPT 的出身：OpenAI 的 Radford 等人在論文《Improving Language Understanding by Generative Pre-Training》中首次提出；GPT-3 是同一套想法的放大版（更多參數、更大資料，2020 年發表）。而 <strong>ChatGPT 初版背後的模型，就是把 GPT-3 用 InstructGPT 論文的方法在大型指令資料集上微調而來</strong>——1.3 那條「預訓練 → 微調」流程的真實案例。</p>
+      <p>相比 1.4 的原始 transformer（encoder 與 decoder 各重複 6 次），GPT 把架構<strong>簡化成只留 decoder</strong>，但疊得深得多：GPT-3 有 <b>96</b> 層 transformer 層、共 <b>175B</b> 參數。訓練任務就只有 next-word prediction——一種<strong>自監督</strong>（self-supervised）的「自我標註」：用句子裡的下一個字當標籤，標籤「隨讀隨生」。</p>
+      <h3>自回歸：自己的輸出，餵給自己</h3>
+      <p>decoder 一次只生成一個字，生完就把它<strong>接回輸入</strong>再算下一個——所以 GPT 這型模型稱為 <span class="en">autoregressive</span>（自回歸）模型。按「下一步」走一遍書中圖 1.8 的三輪迭代（機率為示意值）：</p>
+      <div class="stage">
+        <div class="sent" id="agChips"></div>
+        <div id="agBars" style="margin-top:10px"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="agPrev">← 上一步</button>
+          <button class="btn" id="agNext">下一步 →</button>
+          <button class="btn ghost" id="agPlay">▶ 自動播放</button>
+          <button class="btn ghost" id="agReset">重置</button>
+          <span class="dots" id="agDots"></span>
+        </div>
+        <div class="stepcap" id="agCap"></div>
+      </div>
+      <div class="note"><b>這就是 ChatGPT 逐字吐字的原因</b>——不是打字特效，模型真的「一次只算一個 token」。也因為每個新字都基於前面<strong>所有</strong>字（包括自己剛生成的），輸出才會前後連貫。</div>
+      <div class="plain"><div class="ph">🔰 emergent behavior（湧現行為）</div><p>GPT 的訓練任務只有「接下一個字」，沒有人教它翻譯——<b>但它會翻譯</b>（還會拼字修正、分類、摘要）。這種「沒被明確訓練、卻自己出現」的能力叫<span class="en">emergent behavior</span>：模型接觸大量多語資料後的自然結果。不必為每個任務養一個模型，「一個模型、多樣任務」——LLM 的價值主張正是來自這裡。順帶一提：更新的架構（如 Meta 的 Llama）仍是同一套概念加上小改動——把 GPT 學透，就拿到了看懂現代 LLM 的鑰匙。</p></div>
+    </section>
+
+    <!-- ===== 1.7 ===== -->
+    <section id="sec-17" data-map="all">
+      <div class="sh"><span class="num">1.7</span><h2>Building a large language model（本書的三階段藍圖）</h2></div>
+      <div class="iocard"><span class="io in">input：本章建立的概念地圖</span><span class="ioarrow">→</span><span class="io box">3 個 STAGE · 9 個步驟<small>書中圖 1.9 的路線＝全書目錄</small></span><span class="ioarrow">→</span><span class="io out">output：翻開第 2 章<br>開始寫程式</span></div>
+      <p>概念到齊了，攤開施工圖。本書把「從零打造 GPT」拆成三個階段——<strong>點選查看每個階段的步驟與對應章節：</strong></p>
+      <div class="stage">
+        <div class="controls" id="stPills">
+          <button class="pill on" data-s="0">STAGE 1 · 打地基（ch2–4）</button>
+          <button class="pill" data-s="1">STAGE 2 · 預訓練（ch5）</button>
+          <button class="pill" data-s="2">STAGE 3 · 微調（ch6–7）</button>
+        </div>
+        <div class="tsr" id="stTsr"></div>
+        <div class="stepcap" id="stCap"></div>
+      </div>
+      <p>地圖看完了。下一章開始動手做第一件事：<strong>把文字切成模型讀得懂的 token</strong>——也就是 sticky 管線圖的第二格 ✂️。</p>
+    </section>
+
+    <!-- ===== 小結 ===== -->
+    <section id="sec-sum" data-map="all">
+      <div class="sh"><span class="num">▣</span><h2>本章小結</h2></div>
+      <ul class="clean">
+        <li><b>LLM 是什麼</b>：在海量文字上以 next-word prediction 訓練的深度神經網路；「large」指參數量與資料量兩種規模。座標：AI ⊃ ML ⊃ DL ⊃ LLM，且因會生成而屬於 GenAI。</li>
+        <li><b>預訓練是自監督</b>：標籤就是文字裡的下一個字（右移一格），不需人工標註——所以數兆詞的原始文字都能當教材。</li>
+        <li><b>兩步訓練</b>：先在無標註大語料上<b>預訓練</b>成 foundation model，再用小的標註資料<b>微調</b>——instruction fine-tuning（→ 助理）與 classification fine-tuning（→ 分類器）兩大類。</li>
+        <li><b>transformer</b>（2017，為翻譯而生）＝encoder（讀懂輸入）＋ decoder（逐字生成）；核心是 attention——生成每個字時能選擇性回看整段輸入。</li>
+        <li><b>BERT vs GPT</b>：BERT 取 encoder 做克漏字（masked word prediction）、擅長理解；GPT 取 decoder 做接龍、擅長生成。GPT-3：96 層、175B 參數、訓練 ~300B tokens、成本估計 $4.6M。</li>
+        <li><b>自回歸與湧現</b>：GPT 一次生成一個 token、輸出接回輸入（autoregressive）；zero-shot／few-shot 與翻譯等能力是 emergent behavior。</li>
+        <li><b>三階段藍圖</b>：ch2–4 打地基（資料、attention、架構）→ ch5 預訓練＋載入開源權重 → ch6–7 微調成分類器與助理。</li>
+      </ul>
+    </section>
+
+    <section id="sec-quiz" data-map="all">
+      <div class="sh"><span class="num">✓</span><h2>知識檢核</h2></div>
+      <p class="small" style="margin-bottom:14px">// 七題，作答後立即看解析</p>
+      <div class="quiz" id="quizBox"></div>
+      <div id="score" style="font-family:var(--mono);font-size:14px;color:var(--accent);margin-top:16px"></div>
+    </section>
+
+    <div class="foot">從零打造 LLM · 第 1 章互動教材 ｜ 講解為原創文字，數值與圖表對應 Sebastian Raschka《Build a Large Language Model (From Scratch)》Ch.1 的內容，非原文翻譯<br>頁面中的計算皆為瀏覽器即時運算　·　快捷鍵 <kbd>T</kbd> 切換主題</div>
+  </main>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const root=document.documentElement;
+$("#themeBtn").addEventListener("click",()=>{const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",cur==="dark"?"light":"dark");});
+addEventListener("keydown",e=>{if(e.target.matches&&e.target.matches("input,textarea"))return;if(e.key==="t"||e.key==="T")$("#themeBtn").click();});
+const reduced=matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+/* ===== 全書管線圖（sticky map）===== */
+const STAGES=[
+ {id:"m-data",em:"📚",label:"資料",ch:"ch2"},{id:"m-tok",em:"✂️",label:"Tokenize",ch:"ch2"},
+ {id:"m-emb",em:"▦",label:"Embedding",ch:"ch2"},{id:"m-arch",em:"🧱",label:"Attention/架構",ch:"ch3–4"},
+ {id:"m-pre",em:"🏋️",label:"預訓練",ch:"ch5"},{id:"m-ft",em:"🎯",label:"微調",ch:"ch6–7"},
+ {id:"m-app",em:"💬",label:"應用",ch:"ch6–7"}];
+$("#mapRow").innerHTML=STAGES.map((s,i)=>`<div class="mapstage" data-id="${s.id}" title="本書 ${s.ch}"><span class="em">${s.em}</span>${s.label}</div>`+(i<STAGES.length-1?'<span class="mapsep">›</span>':'')).join("");
+$$(".mapstage").forEach(el=>el.addEventListener("click",()=>{
+  const sec=[...$$("section")].find(s=>{const m=s.dataset.map||"";return m!=="all"&&m.split(",").includes(el.dataset.id);});
+  if(sec){sec.scrollIntoView();}else{document.getElementById("sec-17").scrollIntoView();}
+}));
+function setMap(sec){
+  const raw=(sec&&sec.dataset.map)||"all";
+  const ids=raw==="all"?STAGES.map(s=>s.id):raw.split(",");
+  $$(".mapstage").forEach(el=>el.classList.toggle("lit",ids.includes(el.dataset.id)));
+  if(raw==="all"){$("#mapSub").innerHTML=`全書管線鳥瞰：本章不寫程式，先把整條路線看過一遍（各節會分別點亮對應的段落；點任一格可跳到相關小節）`;}
+  else{const st=ids.map(id=>STAGES.find(s=>s.id===id));$("#mapSub").innerHTML=`本節聚焦：<b>${st.map(s=>s.label).join(" · ")}</b>（對應本書 ${[...new Set(st.map(s=>s.ch))].join("、")}）`;}
+}
+
+/* ===== 積木進度（7 個重點）===== */
+const BRICKS=[["1.1","LLM 是什麼","sec-11"],["1.2","應用場景","sec-12"],["1.3","預訓練→微調","sec-13"],["1.4","Transformer 家族","sec-14"],["1.5","大資料規模","sec-15"],["1.6","GPT 與自回歸","sec-16"],["1.7","三階段藍圖","sec-17"]];
+$("#bricks").innerHTML=BRICKS.map(b=>`<div class="brick" data-sec="${b[2]}"><span class="ck"></span><span><b>${b[0]}</b> ${b[1]}</span></div>`).join("");
+$$(".brick").forEach(el=>el.addEventListener("click",()=>document.getElementById(el.dataset.sec).scrollIntoView()));
+const SEC_ORDER=["sec-intro","sec-11","sec-12","sec-13","sec-14","sec-15","sec-16","sec-17","sec-sum","sec-quiz"];
+function setBricks(curId){
+  const cur=SEC_ORDER.indexOf(curId);
+  $$(".brick").forEach(el=>{
+    const bi=SEC_ORDER.indexOf(el.dataset.sec);
+    el.classList.toggle("done",cur>bi);
+    el.classList.toggle("now",el.dataset.sec===curId);
+    el.querySelector(".ck").textContent=el.classList.contains("done")?"✓":"";
+  });
+}
+
+/* nav + prog + map + bricks（scroll-spy）*/
+const secs=$$("section, .hero"),links=$$("nav.toc a");
+function onScroll(){
+  const h=document.documentElement;$("#prog").style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+"%";
+  let cur=secs[0];for(const s of secs)if(s.getBoundingClientRect().top<=150)cur=s;
+  links.forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+cur.id));
+  setMap(cur.tagName==="SECTION"?cur:null);
+  setBricks(cur.id);
+}
+addEventListener("scroll",onScroll,{passive:true});onScroll();
+
+/* ===== 1.1 AI 圈層探索器 ===== */
+const AI_LAYERS={
+ ai:["AI 人工智慧","<b>最外圈：Artificial Intelligence</b> — 讓機器展現類人智能的整個領域。除了機器學習，也包括「不學習」的路線：規則系統、專家系統、遺傳演算法、模糊邏輯、符號推理。"],
+ ml:["ML 機器學習","<b>Machine Learning</b> — AI 的子集：不把規則寫死，讓演算法<b>從資料中自己學出規則</b>。經典例子：垃圾郵件過濾器——餵它標好 spam／非 spam 的郵件，它靠「最小化預測誤差」自己抓出可疑模式（下面馬上展開）。"],
+ dl:["DL 深度學習","<b>Deep Learning</b> — ML 的子集：用三層以上的（深度）神經網路。關鍵差異：<b>不需要人工特徵工程</b>——傳統 ML 要專家挑特徵，深度網路直接從原始資料自己學。"],
+ llm:["LLM 大型語言模型","<b>Large Language Models</b> — 深度學習對「語言」的應用、規模空前：在海量文字上訓練的深度神經網路。本書的主角，就住在圈層的最核心。"],
+ gen:["GenAI 生成式 AI","<b>Generative AI</b> — 用深度神經網路「創造新內容」（文字、影像、各種媒體）的統稱。LLM 因為會<b>生成</b>文字，所以也屬於 GenAI——這一格因此橫跨在 DL 的邊界上。"]};
+const AI_ORDER=["ai","ml","dl","llm","gen"];
+$("#aiPills").innerHTML=AI_ORDER.map(k=>`<button class="pill" data-l="${k}">${AI_LAYERS[k][0]}</button>`).join("");
+function setAI(k){
+  $$(".aisvg .lay").forEach(g=>g.classList.toggle("on",g.dataset.l===k));
+  $$("#aiPills .pill").forEach(b=>b.classList.toggle("on",b.dataset.l===k));
+  $("#aiCap").innerHTML=AI_LAYERS[k][1];
+}
+$$(".aisvg .lay").forEach(g=>g.addEventListener("click",()=>setAI(g.dataset.l)));
+$$("#aiPills .pill").forEach(b=>b.addEventListener("click",()=>setAI(b.dataset.l)));
+setAI("llm");
+
+/* ===== 1.1 spam：傳統 ML vs DL ===== */
+const SPAM=[
+[`<span class="lbl"># 傳統機器學習：特徵由「專家」手工設計</span>
+郵件文字
+  → 人工挑特徵： "prize" / "win" / "free" 出現次數、
+                驚嘆號數量、全大寫字、可疑連結⋯
+  → 特徵表 ＋ 人工標好的 spam／非 spam 標籤
+  → 訓練分類器`,
+ `<b>傳統 ML</b>：模型只看得到專家挑出的特徵——特徵挑得好不好決定一切，而且<b>換一個任務就要重新設計一次</b>。`],
+[`<span class="lbl"># 深度學習：特徵讓網路自己學</span>
+郵件原文（不做人工特徵工程）
+  → 多層神經網路
+     在「最小化預測誤差」的過程中，自己發現哪些模式代表 spam
+  → 分類器
+<span class="lbl"># 注意：仍需要 spam／非 spam 的「標籤」（由專家或使用者標註）</span>`,
+ `<b>深度學習</b>把「找特徵」自動化了。但注意最後一行：<b>標籤還是要人給</b>。這個標註成本，正是 1.3 預訓練要用「自監督」徹底繞過的東西——先記住這個伏筆。`]];
+function renderSpam(m){
+  $$("#spamSeg button").forEach(b=>b.classList.toggle("on",+b.dataset.m===m));
+  $("#spamTsr").innerHTML=SPAM[m][0];$("#spamCap").innerHTML=SPAM[m][1];
+}
+$$("#spamSeg button").forEach(b=>b.addEventListener("click",()=>renderSpam(+b.dataset.m)));
+renderSpam(0);
+
+/* ===== 1.2 應用探索器 ===== */
+const APPS=[
+["機器翻譯",`<span class="lbl"># 例（示意）</span>
+輸入： 把這句翻成德文：Where is the train station?
+輸出： <span style="color:var(--accent);font-weight:600">Wo ist der Bahnhof?</span>`,
+ `1.6 會揭曉一件怪事：GPT 的翻譯能力甚至<b>不是特別教出來的</b>（emergent behavior）。`],
+["情感分析",`<span class="lbl"># 例（示意）</span>
+輸入： 「排隊 90 分鐘，這服務真是讓我大開眼界。」
+輸出： <span style="color:var(--accent);font-weight:600">負面（含反諷）</span>`,
+ `分類是上一代 NLP 模型的強項，LLM 一樣行——而且讀得懂「反諷」這種需要脈絡的表達。`],
+["文字摘要",`<span class="lbl"># 例（示意）</span>
+輸入： （一份 30 頁的技術報告全文⋯）
+輸出： <span style="color:var(--accent);font-weight:600">三句話的重點摘要</span>`,
+ `長文濃縮成重點——「sifting through documents」正是書中點名的用法之一。`],
+["內容創作・寫程式",`<span class="lbl"># 例（示意）</span>
+輸入： 從這串關鍵字寫一封請假 email：週五、家事、補班
+輸出： <span style="color:var(--accent);font-weight:600">一封得體的 email</span>（換個指令就是小說、文章或可執行的程式）`,
+ `書中特別點名：「從關鍵字清單寫 email」是<b>上一代語言模型做不到</b>、如今卻輕而易舉的任務。`],
+["聊天機器人・助理",`<span class="lbl"># 書中圖 1.2 的真實例子（ChatGPT）</span>
+輸入： Write a 4-line poem containing the words
+       Wisconsin, AI, and pizza.
+輸出： <span style="color:var(--accent);font-weight:600">一首押韻的四行詩</span>`,
+ `ChatGPT、Google Gemini（前身 Bard）這類助理可回答問題、強化傳統搜尋——本書最終章（ch7）就是要做出它的迷你版。`],
+["專業知識檢索",`<span class="lbl"># 例（示意）</span>
+輸入： 「這 200 份病歷裡，哪些提到對 penicillin 過敏？」
+輸出： <span style="color:var(--accent);font-weight:600">檔案清單 ＋ 出處段落</span>`,
+ `醫療、法律這類「文件山」領域：篩讀大量文件、摘要長文、回答技術問題。`]];
+$("#appPills").innerHTML=APPS.map((a,i)=>`<button class="pill ${i===0?'on':''}" data-a="${i}">${a[0]}</button>`).join("");
+function renderApp(i){
+  $$("#appPills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  $("#appTsr").innerHTML=APPS[i][1];$("#appCap").innerHTML=APPS[i][2];
+}
+$$("#appPills .pill").forEach(b=>b.addEventListener("click",()=>renderApp(+b.dataset.a)));
+renderApp(0);
+
+/* ===== 1.3 兩階段流程 ===== */
+const FLOW={
+ raw:"<b>原始文字（raw text）</b>：「raw」＝沒有任何標註資訊的普通文字，只做基本過濾（去除格式字元、刪掉未知語言的文件）。來源：網路文字、書籍、Wikipedia、研究文章——合計數兆個詞。",
+ pre:"<b>預訓練（pretraining）</b>：在海量無標註文字上做 next-word prediction。「pre」＝「先」：先練出廣泛的通用語言能力。這一步吃掉絕大部分算力（1.5 節看帳單），是能力的來源。",
+ found:"<b>基礎模型（foundation / base model）</b>：預訓練的產物。會文字接龍（把半句話補完），還有初步的 few-shot 能力（看幾個例子就能學新任務）。典型例子：GPT-3——ChatGPT 初版模型的前身。",
+ ft:"<b>微調（fine-tuning）</b>：拿「有標註」的小資料集再訓練。兩大類：<b>instruction fine-tuning</b>（指令＋理想回答的成對資料 → ch7 的對話助理）與 <b>classification fine-tuning</b>（文字＋類別標籤，如 spam／非 spam → ch6 的分類器）。"};
+function setFlow(k){
+  $$("#flowCard .io").forEach(el=>el.classList.toggle("pick",el.dataset.f===k));
+  $("#flowCap").innerHTML=FLOW[k];
+}
+$$("#flowCard .io").forEach(el=>el.addEventListener("click",()=>setFlow(el.dataset.f)));
+setFlow("pre");
+
+/* ===== 1.3 自監督：右移一格 ===== */
+const SS_W=["The","model","predicts","the","next","word"];
+const SS_PAIRS=SS_W.slice(0,-1).map((_,i)=>[SS_W.slice(0,i+1).join(" "),SS_W[i+1]]);
+$("#ssChips").innerHTML=SS_W.map((w,i)=>`<span class="wchip" data-k="${i}">${w}<small>#${i}</small></span>`).join("");
+$("#ssTsr").innerHTML=`<span class="lbl"># 一句話 6 個 token → 5 筆「免費」的訓練樣本（input → target）</span>\n`+
+  SS_PAIRS.map((p,i)=>`<span class="tn0" data-k="${i}">看到 ${p[0].padEnd(29)}→ 該預測 ${p[1]}</span>`).join("\n");
+function hiSS(pi){
+  $$("#ssTsr .tn0").forEach(el=>el.classList.toggle("hot",pi!==null&&+el.dataset.k===pi));
+  $$("#ssChips .wchip").forEach(el=>{
+    const i=+el.dataset.k;
+    el.classList.toggle("hot",pi!==null&&(i<=pi||i===pi+1));
+  });
+  if(pi!==null){
+    const p=SS_PAIRS[pi];
+    $("#ssNote").innerHTML=`樣本 ${pi+1}／5：模型看到「<b>${p[0]}</b>」→ 標籤（target）＝下一個字「<b>${p[1]}</b>」。沒有人標註任何東西——<b>答案本來就寫在句子裡</b>。`;
+  }else $("#ssNote").textContent="滑過上面的句子或任一列試試 →";
+}
+$$("#ssChips .wchip").forEach(el=>{
+  const i=+el.dataset.k;
+  el.addEventListener("mouseenter",()=>hiSS(i===0?0:(i===SS_W.length-1?SS_PAIRS.length-1:i)));
+  el.addEventListener("mouseleave",()=>hiSS(null));
+});
+$$("#ssTsr .tn0").forEach(el=>{
+  el.addEventListener("mouseenter",()=>hiSS(+el.dataset.k));
+  el.addEventListener("mouseleave",()=>hiSS(null));
+});
+hiSS(null);
+
+/* ===== 1.4 transformer 家族探索器 ===== */
+function tfSVG(mode){
+  const enc=mode!=="gpt",dec=mode!=="bert";
+  let s=`<svg class="tfsvg" viewBox="0 0 760 252" role="img" aria-label="transformer ${mode}">`;
+  s+=`<g class="blk enc ${enc?'':'off'}"><rect x="80" y="96" width="230" height="64" rx="14"/><text class="bt" x="195" y="122" text-anchor="middle">Encoder</text><text class="bs" x="195" y="142" text-anchor="middle">編碼器 · 讀懂整句（雙向 ↔）</text></g>`;
+  s+=`<g class="blk dec ${dec?'':'off'}"><rect x="450" y="96" width="230" height="64" rx="14"/><text class="bt" x="565" y="122" text-anchor="middle">Decoder</text><text class="bs" x="565" y="142" text-anchor="middle">解碼器 · 逐字生成（單向 →）</text></g>`;
+  if(mode==="orig"){
+    s+=`<path class="fl" d="M310,128 L444,128"/><polygon points="444,122 456,128 444,134" style="fill:var(--accent)"/><text class="bs" x="378" y="116" text-anchor="middle">向量（embeddings）</text>`;
+    s+=`<text class="tok" x="195" y="180" text-anchor="middle">↑</text><text class="tok" x="195" y="200" text-anchor="middle">輸入①原文："This is an example"</text>`;
+    s+=`<text class="tok" x="565" y="180" text-anchor="middle">↑</text><text class="tok" x="565" y="200" text-anchor="middle">輸入②已生成的譯文："Das ist ein"</text>`;
+    s+=`<text class="tok" x="565" y="86" text-anchor="middle">↑</text><text class="tok" x="565" y="62" text-anchor="middle">輸出：Das ist ein <tspan class="tokhl">Beispiel</tspan></text>`;
+  }else if(mode==="bert"){
+    s+=`<text class="tok" x="195" y="180" text-anchor="middle">↑</text><text class="tok" x="195" y="200" text-anchor="middle">輸入："This is an <tspan class="mask">__</tspan> of how concise I <tspan class="mask">__</tspan> be"</text>`;
+    s+=`<text class="bs" x="195" y="220" text-anchor="middle">（訓練時隨機遮字）</text>`;
+    s+=`<text class="tok" x="195" y="86" text-anchor="middle">↑</text><text class="tok" x="195" y="62" text-anchor="middle">輸出：還原 <tspan class="tokhl">example</tspan> 與 <tspan class="tokhl">can</tspan>（用左右上下文）</text>`;
+  }else{
+    s+=`<text class="tok" x="565" y="180" text-anchor="middle">↑</text><text class="tok" x="565" y="200" text-anchor="middle">輸入："This is an example of how concise I can"</text>`;
+    s+=`<text class="bs" x="565" y="220" text-anchor="middle">（只餵不完整的句子）</text>`;
+    s+=`<text class="tok" x="565" y="86" text-anchor="middle">↑</text><text class="tok" x="565" y="62" text-anchor="middle">輸出：下一個字 <tspan class="tokhl">"be"</tspan></text>`;
+  }
+  s+=`</svg>`;return s;
+}
+const TF_CAPS={
+ orig:`<b>原始 transformer＝翻譯機</b>：encoder 一次讀完整句英文、壓成一串向量；decoder 邊看這些向量、邊逐字輸出德文。圖中是翻譯的最後一步：已生成 "Das ist ein"，正要接出「Beispiel」——一次一個字。`,
+ bert:`<b>BERT</b>（bidirectional encoder representations from transformers）只取 <b>encoder</b>：訓練時隨機遮字，模型用「左右兩側」的上下文還原——克漏字（masked word prediction）。擅長理解型任務：文本分類、情感預測；X（前 Twitter）就用 BERT 偵測有害內容。`,
+ gpt:`<b>GPT</b>（generative pretrained transformers）只取 <b>decoder</b>：只看左邊、預測下一個字（next-word prediction），天生會接龍、擅長生成——翻譯、摘要、寫小說、寫程式。本書從零打造的正是它，1.6 節放大細看。`};
+function renderTF(mode){
+  $$("#tfSeg button").forEach(b=>b.classList.toggle("on",b.dataset.m===mode));
+  $("#tfWrap").innerHTML=tfSVG(mode);$("#tfCap").innerHTML=TF_CAPS[mode];
+}
+$$("#tfSeg button").forEach(b=>b.addEventListener("click",()=>renderTF(b.dataset.m)));
+renderTF("orig");
+
+/* ===== 1.4 zero-shot vs few-shot（書中圖 1.6）===== */
+const FS=[
+[`<span class="lbl"># 文字接龍 text completion（foundation model 的本能）</span>
+輸入： Breakfast is the
+輸出： <span style="color:var(--accent);font-weight:600">most important meal of the day.</span>`,
+ `<b>接龍</b>是預訓練直接練出來的本能：給半句話，它就往下補出合理的文字。接下來兩個模式，都是把「任務」偽裝成「待接的文字」。`],
+[`<span class="lbl"># zero-shot：零個範例</span>
+輸入： Translate English to German:
+       breakfast =>
+輸出： <span style="color:var(--accent);font-weight:600">Frühstück</span>`,
+ `<b>zero-shot</b>＝一個範例都不給，只用文字「描述」任務，模型就能泛化到完全沒見過的任務。`],
+[`<span class="lbl"># few-shot：給幾個範例，現學現賣</span>
+輸入： gaot => goat
+       sheo => shoe
+       pohne =>
+輸出： <span style="color:var(--accent);font-weight:600">phone</span>`,
+ `<b>few-shot</b>＝在輸入裡塞幾個範例（這裡的任務：還原拼錯的字），模型從模式中「學」會該做什麼。注意：兩種模式都<b>不需要重新訓練、不改任何權重、不改架構</b>。`]];
+function renderFS(m){
+  $$("#fsSeg button").forEach(b=>b.classList.toggle("on",+b.dataset.m===m));
+  $("#fsTsr").innerHTML=FS[m][0];$("#fsCap").innerHTML=FS[m][1];
+}
+$$("#fsSeg button").forEach(b=>b.addEventListener("click",()=>renderFS(+b.dataset.m)));
+renderFS(0);
+
+/* ===== 1.5 GPT-3 資料配方（表 1.1 真實數值）===== */
+const DS=[
+ ["CommonCrawl（filtered）","網路爬蟲資料",410,60,"經過濾的網路爬蟲——量大管飽、品質靠過濾。光這一個子集就有 410B tokens、約 <b>570 GB</b> 儲存。"],
+ ["WebText2","網路爬蟲資料（高品質網頁）",19,22,"只有 19B tokens 卻佔 <b>22%</b> 抽樣比重 → 訓練時被<b>重複看了好幾遍</b>：高品質來源被刻意加權。"],
+ ["Books1","網路書庫",12,8,"12B tokens、佔 8%。書籍語料：長篇、編輯過、結構完整。"],
+ ["Books2","網路書庫",55,8,"55B tokens 卻只佔 8%——和 WebText2 相反，可能一遍都沒被看完。"],
+ ["Wikipedia","高品質文字",3,3,"只有 3B tokens：高品質文字的代表，量小但精。"]];
+let dsMode=0;
+$("#dsRows").innerHTML=DS.map((d,i)=>`<div class="pbrow" data-d="${i}" style="grid-template-columns:190px 1fr 170px;cursor:default"><span title="${d[1]}">${d[0]}</span><div class="barwrap"><div class="bar"></div></div><span class="cnum"></span></div>`).join("");
+function renderDS(){
+  $$("#dsSeg button").forEach(b=>b.classList.toggle("on",+b.dataset.m===dsMode));
+  $$("#dsRows .pbrow").forEach((row,i)=>{
+    const d=DS[i];
+    const w=dsMode===0?d[3]/60*100:d[2]/410*100;
+    row.querySelector(".bar").style.width=Math.max(1.5,w)+"%";
+    row.querySelector(".cnum").textContent=dsMode===0?`${d[3]}%（${d[2]}B tokens）`:`${d[2]}B tokens（${d[3]}%）`;
+    row.classList.toggle("amx",i===0);
+  });
+  $("#dsCap").innerHTML=dsMode===0
+   ?`「比例」是<b>訓練時的抽樣權重</b>（總和 100%）——不是資料大小的比例。滑過任一長條，看每個來源的故事。`
+   :`換成 token 數再看一次：五個子集合計 <b>499B</b> tokens，但 GPT-3 實際只用了約 <b>300B</b> 訓練（論文沒有說明原因）。對照上一個視圖：<b>token 多 ≠ 被看得多</b>（WebText2 vs Books2）。`;
+}
+$$("#dsSeg button").forEach(b=>b.addEventListener("click",()=>{dsMode=+b.dataset.m;renderDS();}));
+$$("#dsRows .pbrow").forEach(row=>{
+  row.addEventListener("mouseenter",()=>{$("#dsCap").innerHTML=`<b>${DS[+row.dataset.d][0]}</b>：`+DS[+row.dataset.d][4];});
+  row.addEventListener("mouseleave",()=>renderDS());
+});
+renderDS();
+
+/* ===== 1.5 規模換算器 ===== */
+function renderRD(){
+  const r=parseInt($("#rdSlider").value,10);$("#rdVal").textContent=r;
+  const perYear=r*60*24*365;
+  const yrs=Math.round(300e9/perYear);
+  const gen=Math.round(yrs/30);
+  $("#rdOut").innerHTML=`以每分鐘 <b>${r}</b> 個 token 的速度、不吃不睡地讀，讀完 GPT-3 的 300B tokens 要 ≈ <b>${yrs.toLocaleString("en-US")} 年</b>（約 ${gen.toLocaleString("en-US")} 個世代）——而 GPT-3 在「讀」的同時，還順手把 175B 個權重調好了。`;
+}
+$("#rdSlider").addEventListener("input",renderRD);
+renderRD();
+
+/* ===== 1.6 自回歸接龍（圖 1.8）===== */
+const AG=[
+ {cand:[["is",41],["was",17],["morning",8]],pick:"is"},
+ {cand:[["an",32],["the",24],["not",9]],pick:"an"},
+ {cand:[["example",29],["apple",11],["idea",9]],pick:"example"}];
+const AG_CAPS=[
+ `<b>Iteration 1</b>：前文只有 "This"。模型輸出整個詞彙表的機率分佈（這裡只畫前 3 名，數值為示意）——最高的是 "is"。按「下一步」把它接上。`,
+ `<b>Iteration 2</b>：注意輸入變成了 "This is"——<b>上一輪的輸出成了這一輪輸入的一部分</b>。「自己的輸出餵給自己」＝ autoregressive（自回歸）。`,
+ `<b>Iteration 3</b>：前文 "This is an"，下一個字最可能是 "example"。`,
+ `<b>完成</b>："This is an example"——4 個字＝3 輪 forward。ChatGPT 寫一段 500 字的回覆，就是這個迴圈跑幾百次。`];
+let agI=0,agTimer=null;
+function renderAG(){
+  const toks=["This"].concat(AG.slice(0,agI).map(s=>s.pick));
+  $("#agChips").innerHTML=toks.map((w,i)=>`<span class="wchip ${i===toks.length-1&&agI>0?'hot':''}">${w}<small>${i===0?'起點':'第 '+i+' 輪生成'}</small></span>`).join("")
+   +(agI<3?`<span class="wchip dim">?<small>接下來</small></span>`:"");
+  if(agI<3){
+    const st=AG[agI];
+    $("#agBars").innerHTML=`<div class="small" style="margin-bottom:6px"># P(下一個字 | "${toks.join(" ")}")　——示意分佈，前 3 名</div>`+
+      st.cand.map((c,i)=>`<div class="pbrow ${i===0?'amx':''}" style="grid-template-columns:100px 1fr 90px"><span>${c[0]}</span><div class="barwrap"><div class="bar" style="width:${c[1]/41*100}%"></div></div><span class="cnum">${c[1]}%</span></div>`).join("");
+  }else{
+    $("#agBars").innerHTML=`<div class="small" style="padding:6px 0">✓ 生成結束（真實模型會繼續，直到長度上限或結束符）</div>`;
+  }
+  $("#agCap").innerHTML=AG_CAPS[agI];
+  $("#agDots").innerHTML=Array.from({length:4},(_,i)=>`<span class="dot2 ${i===agI?'on':''}"></span>`).join("");
+  $("#agPrev").disabled=agI===0;$("#agNext").disabled=agI===3;
+}
+$("#agNext").addEventListener("click",()=>{if(agI<3){agI++;renderAG();}});
+$("#agPrev").addEventListener("click",()=>{if(agI>0){agI--;renderAG();}});
+$("#agReset").addEventListener("click",()=>{if(agTimer){clearInterval(agTimer);agTimer=null;}agI=0;renderAG();});
+$("#agPlay").addEventListener("click",()=>{
+  if(agTimer){clearInterval(agTimer);agTimer=null;}
+  if(reduced){agI=3;renderAG();return;}
+  agI=0;renderAG();
+  agTimer=setInterval(()=>{agI++;renderAG();if(agI>=3){clearInterval(agTimer);agTimer=null;}},950);
+});
+renderAG();
+
+/* ===== 1.7 三階段藍圖（圖 1.9）===== */
+const ST=[
+[`<span class="lbl"># STAGE 1 —— 打地基：實作資料處理與模型骨架（本書 ch2–ch4）</span>
+1) 資料準備與取樣    → ch2   <span class="lbl"># tokenize、embedding、「右移一格」data loader</span>
+2) attention 機制    → ch3   <span class="lbl"># self-attention 從零手刻</span>
+3) LLM 架構          → ch4   <span class="lbl"># 把零件組裝成 GPTModel</span>
+                      ↓
+4) 預訓練            → 進入 STAGE 2`,
+ `打地基：實作資料取樣、理解基本機制。1.3 的「右移一格」小互動就是 ch2 的主菜預告；sticky 管線圖的前四格（📚✂️▦🧱）都在這個階段。`],
+[`<span class="lbl"># STAGE 2 —— 預訓練出 foundation model（ch5）</span>
+5) 訓練迴圈          <span class="lbl"># 讓 next-word prediction 真的跑起來</span>
+6) 模型評估          <span class="lbl"># loss、train vs validation</span>
+7) 載入開源權重      <span class="lbl"># 把 OpenAI 公開的 GPT-2 權重搬進自己的模型</span>`,
+ `在無標註資料上預訓練出 foundation model。真預訓練要花數千到數百萬美元，所以本書用小資料集教學、再載入公開權重——1.5 那張 $4.6M 帳單就這樣繞過。`],
+[`<span class="lbl"># STAGE 3 —— 微調成專才（ch6–ch7）</span>
+8) 分類微調          → ch6   <span class="lbl"># 帶類別標籤的資料 → spam 分類器</span>
+9) 指令微調          → ch7   <span class="lbl"># 指令資料集 → 會對話的個人助理</span>`,
+ `把 foundation model 變成專才：1.3 的兩種微調口味在此收尾——classification fine-tuning（ch6）與 instruction fine-tuning（ch7）。這也是實務上最常見的兩類任務。`]];
+function renderST(i){
+  $$("#stPills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  $("#stTsr").innerHTML=ST[i][0];$("#stCap").innerHTML=ST[i][1];
+}
+$$("#stPills .pill").forEach((b,i)=>b.addEventListener("click",()=>renderST(i)));
+renderST(0);
+
+/* ===== quiz ===== */
+const quiz=[
+ {q:"LLM 在預訓練階段唯一的學習目標是什麼？",o:["把句子翻成英文","預測序列中的下一個 token（next-word prediction）","把文件分類到正確類別","把整個訓練集背下來"],a:1,e:"給定前文，輸出「下一個 token 是誰」的機率分佈。任務簡單到令人意外，但配上巨大規模，就足以逼模型學會語法、語意、脈絡——第 2～5 章會親手實作這個訓練目標。"},
+ {q:"「large language model」的 large 指的是？",o:["模型檔案的名稱很長","輸出的文章很長","參數量（數百億）與訓練資料量都空前地大","詞彙表比字典大"],a:2,e:"兩個規模：以 GPT-3 為例，175B 個參數、約 300B tokens 的訓練資料。參數是訓練中不斷調整的權重，資料是它學習的教材。"},
+ {q:"為什麼 LLM 的預訓練「不需要人工標註資料」？",o:["因為模型自己會發明答案","因為用了無監督的分群演算法","因為 next-word prediction 的標籤就是文字裡的下一個字——資料自帶答案（自監督）","因為 OpenAI 已經先標好了"],a:2,e:"self-supervised learning：把句子「右移一格」，target 就自動生出來了。所以任何原始文字都能當訓練資料——這是 LLM 能吃下數兆詞語料的關鍵，也和需要人工標籤的傳統監督學習（如 spam 分類）形成對比。"},
+ {q:"2017 年的原始 transformer（Attention Is All You Need）當初是為了什麼設計的？",o:["聊天機器人","機器翻譯：encoder 讀懂原文、decoder 逐字生成譯文（英→德、法）","圖片分類","語音辨識"],a:1,e:"原始 transformer 是 encoder-decoder 架構的翻譯模型。BERT 與 GPT 都是後來「各取一半」的變體——這也是為什麼理解它是理解 LLM 的起點。"},
+ {q:"BERT 與 GPT 最關鍵的差異是？",o:["BERT 比 GPT 大得多","GPT 用 encoder、BERT 用 decoder","BERT 走 encoder 路線做克漏字（masked word prediction）、擅長理解；GPT 走 decoder 路線做接龍（next-word）、擅長生成","BERT 不是 transformer"],a:2,e:"BERT 用整句的左右上下文還原被遮的字，強項是分類這類理解任務（X／前 Twitter 用它偵測有害內容）；GPT 只看左邊、逐字生成。本書打造的是 GPT 這一型。"},
+ {q:"「zero-shot」指的是什麼能力？",o:["模型參數為零也能運作","不給任何範例、只用文字描述任務，模型就能完成","訓練零個 epoch","一次生成零個字"],a:1,e:"zero-shot＝泛化到完全沒見過的任務；few-shot＝在 prompt 裡塞幾個範例讓它現學現賣。重點：兩者都不需要重新訓練、不改權重、不改架構。"},
+ {q:"GPT 沒有被特別訓練過翻譯，卻會翻譯。這種現象叫什麼？",o:["過擬合（overfitting）","資料洩漏（data leakage）","湧現行為（emergent behavior）——沒被明確教過的能力，隨規模與多語資料自然出現","梯度消失"],a:2,e:"訓練任務只有 next-word prediction，翻譯能力是模型接觸大量多語資料後自然湧現的結果。「一個模型、多樣任務」的價值主張正是來自這裡。"}];
+const qc=$("#quizBox");let ans=0,cor=0;
+quiz.forEach((it,qi)=>{const w=document.createElement("div");w.className="q";w.innerHTML=`<div class="qn">Q${qi+1} / ${quiz.length}</div><div class="qt">${it.q}</div>`;
+ it.o.forEach((o,oi)=>{const b=document.createElement("button");b.className="opt";b.innerHTML=o+'<span class="mk"></span>';
+  b.addEventListener("click",()=>{if(w.dataset.done)return;w.dataset.done=1;ans++;const ok=oi===it.a;if(ok)cor++;b.classList.add(ok?"correct":"wrong");b.querySelector(".mk").textContent=ok?"✓":"✗";if(!ok){const cb=w.querySelectorAll(".opt")[it.a];cb.classList.add("correct");cb.querySelector(".mk").textContent="✓";}w.querySelector(".exp").classList.add("show");if(ans===quiz.length)$("#score").textContent=`完成 ✓ 答對 ${cor} / ${quiz.length} 題`;});
+  w.appendChild(b);});
+ const ex=document.createElement("div");ex.className="exp";ex.textContent="▸ "+it.e;w.appendChild(ex);qc.appendChild(w);});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ch2 處理文字資料｜互動教材</title>
+<style>
+:root{
+  --accent:#2e9e78;--accent-soft:#42b892;--accent-ghost:rgba(46,158,120,.12);
+  --bg:#e6ebe8;--grid:rgba(16,30,24,.05);--surface:#f4f8f6;--surface-2:#e6efea;
+  --ink:#12201a;--muted:#576760;--faint:#8a9992;
+  --line:rgba(16,30,24,.14);--line-strong:rgba(16,30,24,.28);
+  --ok:#3f8a52;--bad:#c0492f;--cool:#2f6fb0;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"PingFang TC","Noto Sans TC","Segoe UI",sans-serif;
+  --maxw:1220px;--read:68ch;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#07100c;--grid:rgba(66,184,146,.06);--surface:#0e1813;--surface-2:#15221b;
+  --ink:#e0ece6;--muted:#93a49c;--faint:#647268;--line:rgba(220,240,232,.13);--line-strong:rgba(220,240,232,.26);
+  --accent:#3cbf94;--accent-soft:#5fd4ad;--accent-ghost:rgba(60,191,148,.15);--ok:#5faf70;--bad:#e2694f;--cool:#6f9ede;}}
+:root[data-theme="light"]{--bg:#e6ebe8;--grid:rgba(16,30,24,.05);--surface:#f4f8f6;--surface-2:#e6efea;--ink:#12201a;--muted:#576760;--faint:#8a9992;--line:rgba(16,30,24,.14);--line-strong:rgba(16,30,24,.28);--accent:#2e9e78;--accent-soft:#42b892;--accent-ghost:rgba(46,158,120,.12);--ok:#3f8a52;--bad:#c0492f;--cool:#2f6fb0;}
+:root[data-theme="dark"]{--bg:#07100c;--grid:rgba(66,184,146,.06);--surface:#0e1813;--surface-2:#15221b;--ink:#e0ece6;--muted:#93a49c;--faint:#647268;--line:rgba(220,240,232,.13);--line-strong:rgba(220,240,232,.26);--accent:#3cbf94;--accent-soft:#5fd4ad;--accent-ghost:rgba(60,191,148,.15);--ok:#5faf70;--bad:#e2694f;--cool:#6f9ede;}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.68;-webkit-font-smoothing:antialiased;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:30px 30px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+a{color:var(--accent)}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:70;transition:width .1s}
+header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 88%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:52px}
+.brand{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px}.brand b{color:var(--ink)}
+.chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--accent);color:var(--accent);border-radius:2px}
+.spacer{flex:1}.tbtn{font-family:var(--mono);font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:3px;padding:5px 10px;cursor:pointer}.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+/* 全域資料管線圖 */
+.map{position:sticky;top:52px;z-index:49;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:8px 0 6px}
+.map .wrap{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:none}
+.map .wrap::-webkit-scrollbar{display:none}
+.mapstage{flex:none;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);cursor:pointer;transition:.25s;white-space:nowrap}
+.mapstage .em{font-size:12px}
+.mapstage:hover{border-color:var(--accent-soft)}
+.mapstage.lit{background:var(--accent);color:#04220f;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ghost)}
+.mapsep{flex:none;color:var(--faint);padding:0 2px;font-size:11px}
+.mapsub{font-family:var(--mono);font-size:11px;color:var(--accent);padding:3px 0 0;min-height:16px}
+.mapsub b{color:var(--ink)}
+@media(max-width:700px){.mapstage{font-size:10px;padding:4px 7px}}
+/* layout */
+.shell{display:grid;grid-template-columns:186px minmax(0,1fr);gap:40px;padding-top:28px}
+@media(max-width:960px){.shell{grid-template-columns:1fr;gap:0}}
+nav.toc{position:sticky;top:118px;align-self:start;font-family:var(--mono);font-size:12px;max-height:calc(100vh - 140px);overflow:auto}
+@media(max-width:960px){nav.toc{display:none}}
+nav.toc .lbl{color:var(--faint);letter-spacing:.14em;font-size:10px;text-transform:uppercase;margin-bottom:10px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--ink);border-color:var(--line-strong)}nav.toc a.active{color:var(--accent);border-color:var(--accent)}
+main{min-width:0}
+.hero{padding:6px 0 26px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(26px,4.6vw,42px);line-height:1.06;margin:0;letter-spacing:-.01em}
+h1 .sub{display:block;font-size:clamp(14px,2.2vw,18px);color:var(--muted);font-weight:500;margin-top:10px}
+.lede{font-size:16px;color:var(--muted);max-width:var(--read);margin:16px 0 0}
+section{padding:38px 0;border-bottom:1px solid var(--line);scroll-margin-top:132px}
+.sh{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;flex-wrap:wrap}
+.sh .num{font-family:var(--mono);color:var(--accent);font-size:13px;font-weight:600}
+h2{font-family:var(--mono);font-weight:600;font-size:clamp(18px,2.8vw,24px);margin:0;letter-spacing:-.01em}
+h3{font-family:var(--mono);font-size:15px;margin:28px 0 8px;font-weight:600;color:var(--ink)}
+p{max-width:var(--read);margin:12px 0;color:var(--muted)}p strong,li strong{color:var(--ink)}
+.en{font-family:var(--mono);font-size:.92em;color:var(--accent);font-weight:600}
+ul.clean{max-width:var(--read);padding-left:0;list-style:none;margin:14px 0}ul.clean li{position:relative;padding-left:20px;margin:8px 0;color:var(--muted)}
+ul.clean li::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+.plain{max-width:var(--read);background:var(--accent-ghost);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 16px;margin:16px 0;font-size:14.5px;color:var(--ink)}
+.plain .ph{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent);font-weight:700;margin-bottom:5px}
+.plain p{margin:6px 0 0;color:var(--ink);max-width:none}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.small{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+canvas{display:block;width:100%;height:auto}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:14px 0}
+pre .c{color:var(--faint)}pre .k{color:var(--accent)}
+code.inl{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:var(--ink)}
+.btn{font-family:var(--mono);font-size:12.5px;padding:8px 15px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#04220f;cursor:pointer;font-weight:600}
+.btn.ghost{background:none;color:var(--accent)}.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font-family:var(--mono);font-size:12px;padding:7px 12px;background:var(--surface-2);border:none;border-right:1px solid var(--line);cursor:pointer;color:var(--muted)}
+.seg button:last-child{border-right:none}.seg button.on{background:var(--accent);color:#04220f}
+.pill{font-family:var(--mono);font-size:12px;padding:6px 11px;border:1px solid var(--line);background:var(--surface-2);border-radius:20px;cursor:pointer;color:var(--muted)}
+.pill:hover{border-color:var(--accent);color:var(--accent)}.pill.on{background:var(--accent);color:#04220f;border-color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+input[type=range]{-webkit-appearance:none;height:4px;border-radius:3px;background:var(--surface-2);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+textarea{width:100%;font-family:var(--sans);font-size:15px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);resize:vertical}
+textarea:focus{outline:none;border-color:var(--accent)}
+/* tensor（array）呈現 */
+.tsr{font-family:var(--mono);font-size:12.5px;line-height:1.9;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.tsr .pn{color:var(--faint)}
+.tsr .lbl{color:var(--faint);font-size:11px}
+.tn{display:inline-block;padding:0 5px;border-radius:5px;transition:.12s;cursor:default}
+.tn:hover,.tn.hot{background:var(--accent);color:#04220f!important}
+.tn.dimmed{opacity:.35}
+.tn.neg{color:var(--cool)}
+.tsrnote{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-height:18px;margin-top:8px}
+.tsrnote b{color:var(--ink)}
+/* 對齊用：無 padding 的行高亮（等寬對齊不能加 padding） */
+.mn{border-radius:5px;transition:.12s;cursor:default}
+.mn.hot{background:var(--accent);color:#04220f}
+.mn.hot .pn,.mn.hot .lbl{color:#04220f}
+/* 積木進度（本章 8 個步驟） */
+.bricks{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin:14px 0}
+.brick{font-family:var(--mono);font-size:11.5px;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--muted);cursor:pointer;transition:.25s;display:flex;gap:8px;align-items:flex-start}
+.brick .ck{width:16px;height:16px;flex:none;border:1.5px solid var(--line-strong);border-radius:4px;display:grid;place-items:center;font-size:10px;color:#fff;margin-top:1px}
+.brick.done{border-color:var(--ok);color:var(--ink)}.brick.done .ck{background:var(--ok);border-color:var(--ok)}
+.brick.now{border-color:var(--accent);background:var(--accent-ghost);color:var(--ink);box-shadow:0 0 0 3px var(--accent-ghost)}
+.brick.now .ck{border-color:var(--accent);color:var(--accent)}
+/* 句子 chips */
+.sent{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+.wchip{font-family:var(--mono);font-size:13.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);cursor:default;transition:.12s}
+.wchip.hot{background:var(--accent);color:#04220f;border-color:var(--accent)}
+.wchip small{display:block;font-size:9.5px;color:var(--faint);text-align:center}
+.wchip.hot small{color:#04220f}
+.wchip.punct{background:color-mix(in srgb,var(--cool) 14%,var(--surface-2));border-color:color-mix(in srgb,var(--cool) 40%,var(--line))}
+.wchip.unk{background:color-mix(in srgb,var(--bad) 12%,var(--surface-2));border-color:var(--bad);color:var(--bad)}
+.wchip.unk small{color:var(--bad)}
+.wchip.eot{background:var(--accent);color:#04220f;border-color:var(--accent)}
+.wchip.eot small{color:#04220f}
+.wchip.masked{color:var(--faint);border-style:dashed}
+/* stepper 共用 */
+.stepbar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.dots{display:flex;gap:6px;align-items:center;margin-left:auto}
+.dot2{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}.dot2.on{background:var(--accent)}
+.stepcap{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--accent-ghost);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;padding:11px 14px;margin-top:12px;min-height:42px}
+.stepcap b{color:var(--accent)}
+/* code-line stepper */
+.codelines{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 0;overflow-x:auto}
+.cl{padding:3px 16px;white-space:pre;color:var(--muted);border-left:3px solid transparent;transition:.2s}
+.cl.lit{background:var(--accent-ghost);border-left-color:var(--accent);color:var(--ink)}
+.cl .cm{color:var(--faint)}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--accent-ghost);border-radius:0 8px 8px 0;padding:12px 15px;margin:16px 0;max-width:var(--read);font-size:14px;color:var(--muted)}.note b{color:var(--accent)}
+/* 表格 */
+.cmtable{border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.cmtable th,.cmtable td{border:1px solid var(--line);padding:7px 10px;text-align:center}
+.cmtable th{color:var(--muted);font-weight:600;background:var(--surface-2);font-size:11px}
+.cmtable td.tgt{outline:2px solid var(--accent);outline-offset:-2px;font-weight:700;color:var(--accent)}
+.cmtable td.amx{background:var(--accent-ghost)}
+.cmtable td.dim{color:var(--faint)}
+/* io 卡 */
+.iocard{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin:12px 0 6px;overflow-x:auto;padding-bottom:2px}
+.iocard .io{display:flex;flex-direction:column;justify-content:center;text-align:center;padding:8px 12px;border-radius:8px;line-height:1.5;flex:none}
+.iocard .in,.iocard .out{border:1.5px dashed var(--line-strong);color:var(--muted);background:var(--surface)}
+.iocard .out{border-color:var(--accent-soft)}
+.iocard .box{border:1.5px solid var(--accent);background:var(--accent-ghost);color:var(--ink);font-weight:600}
+.iocard .box small{display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px}
+.iocard .ioarrow{align-self:center;color:var(--faint);flex:none}
+/* 往返動畫 */
+.w2e{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;min-height:90px}
+.w2e .stg{opacity:.22;transition:opacity .45s,transform .45s;transform:translateY(5px);flex:none}
+.w2e .stg.lit{opacity:1;transform:none}
+.w2e .arrow{color:var(--faint);font-size:10.5px;text-align:center;line-height:1.5}
+.w2e .wordbig{font-size:15px;font-weight:700;color:var(--accent);border:1.5px solid var(--accent);border-radius:10px;padding:10px 14px;background:var(--accent-ghost)}
+.w2e .idbig{font-size:13px;font-weight:600;border:1.5px solid var(--line-strong);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
+.decoded{font-family:var(--mono);font-size:13.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;min-height:44px}
+.decoded .nw{color:var(--accent);font-weight:700}
+.decoded .bad2{color:var(--bad);font-weight:700}
+/* token 磁帶（sliding window 用） */
+.tape{display:flex;gap:4px;overflow-x:auto;padding:6px 0;margin:8px 0}
+.tcell{flex:none;min-width:52px;text-align:center;font-family:var(--mono);font-size:12px;padding:8px 5px;border-radius:7px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);transition:.2s;position:relative}
+.tcell .w{font-size:9px;color:var(--faint);display:block;white-space:nowrap}
+.tcell.inp{background:color-mix(in srgb,var(--accent) 24%,var(--surface-2));border-color:var(--accent);color:var(--ink)}
+.tcell.tgt{box-shadow:inset 0 -3px 0 var(--cool)}
+.tcell.dim{opacity:.45}
+.winleg{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px}
+.winleg i{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:5px}
+/* 2.1 embedding 空間散點（示意） */
+.scat{position:relative;height:280px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);overflow:hidden}
+.scat .ax{position:absolute;font-family:var(--mono);font-size:10px;color:var(--faint)}
+.sw{position:absolute;transform:translate(-50%,-50%);font-family:var(--mono);font-size:12px;padding:5px 10px;border:1px solid var(--line-strong);border-radius:16px;background:var(--surface);cursor:pointer;transition:.15s;white-space:nowrap}
+.sw:hover{border-color:var(--accent)}
+.sw.hot{background:var(--accent);color:#04220f;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ghost)}
+.sw.dim{opacity:.3}
+/* quiz */
+.quiz .q{margin:18px 0}.quiz .qn{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:7px}.quiz .qt{font-weight:600;color:var(--ink);max-width:var(--read);margin-bottom:9px}
+.opt{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 14px;margin:6px 0;cursor:pointer;font-family:var(--sans);font-size:14px;color:var(--ink);max-width:var(--read)}
+.opt:hover{border-color:var(--accent)}.opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.opt .mk{float:right;font-family:var(--mono);font-weight:700}.opt.correct .mk{color:var(--ok)}.opt.wrong .mk{color:var(--bad)}
+.exp{max-width:var(--read);font-size:13px;color:var(--muted);padding:9px 14px;border-left:2px solid var(--accent);margin:5px 0 0;display:none}.exp.show{display:block}
+.foot{font-family:var(--mono);font-size:11px;color:var(--faint);padding:28px 0 70px;text-align:center;line-height:1.9}
+kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<header class="top"><div class="wrap">
+  <div class="brand"><span class="chip">CH·2</span><b><a href="index.html" style="color:inherit;text-decoration:none">從零打造 LLM</a></b><span style="color:var(--faint)">/ 處理文字資料</span></div>
+  <div class="spacer"></div><button class="tbtn" id="themeBtn">◐ 主題</button>
+</div></header>
+
+<div class="map">
+  <div class="wrap" id="mapRow"></div>
+  <div class="wrap"><div class="mapsub" id="mapSub"></div></div>
+</div>
+
+<div class="wrap"><div class="shell">
+  <nav class="toc" aria-label="章節導覽">
+    <div class="lbl">Chapter 2</div>
+    <a href="#sec-intro">本章定位 · 8 個步驟</a>
+    <a href="#sec-21">2.1 詞嵌入是什麼</a>
+    <a href="#sec-22">2.2 斷詞</a>
+    <a href="#sec-23">2.3 Token → ID</a>
+    <a href="#sec-24">2.4 特殊 token</a>
+    <a href="#sec-25">2.5 BPE 子詞</a>
+    <a href="#sec-26">2.6 滑動視窗取樣</a>
+    <a href="#sec-27">2.7 Token embedding</a>
+    <a href="#sec-28">2.8 位置編碼</a>
+    <a href="#sec-sum">本章小結</a>
+    <a href="#sec-quiz">✓ 知識檢核</a>
+  </nav>
+
+  <main>
+    <div class="hero" id="top">
+      <p class="eyebrow">Build a Large Language Model (From Scratch) · Chapter 2</p>
+      <h1>處理文字資料<span class="sub">Working with text data</span></h1>
+      <p class="lede">GPT 不吃文字，只吃數字。這一章把一篇 20,479 字元的短篇小說《The Verdict》一路加工成模型能吃的張量：先斷成 <span class="en">token</span>、查表變 <span class="en">token ID</span>、換上 GPT 真正使用的 <span class="en">BPE</span> 子詞斷詞器、用<strong>滑動視窗</strong>切出一對對 (input, target) 訓練樣本、最後查 <span class="en">embedding</span> 表變成向量、加上位置資訊。頁面中的關鍵數值都與書中執行輸出一致（示意值會另行標明）。</p>
+    </div>
+
+    <!-- ===== 本章定位 ===== -->
+    <section id="sec-intro" data-map="all">
+      <div class="sh"><span class="num">00</span><h2>本章定位：幫模型「備料」</h2></div>
+      <p>整本書的三階段地圖裡，本章是<strong>第一階段的第一步：資料準備與取樣</strong>——後面所有章節的資料，都從這條管線流出來：</p>
+      <div class="iocard">
+        <span class="io box">STAGE 1（ch2–4）<br>打造 LLM 架構<small>本章＝① 資料準備與取樣 · 之後：② attention（ch3）③ 架構（ch4）</small></span><span class="ioarrow">→</span>
+        <span class="io in">STAGE 2（ch5）<br>預訓練 pretraining</span><span class="ioarrow">→</span>
+        <span class="io out">STAGE 3（ch6–7）<br>微調：分類器 / 助理</span>
+      </div>
+      <p>本章的 8 個步驟——<strong>會隨你往下讀自動打勾</strong>（也可以點擊跳到該節）：</p>
+      <div class="bricks" id="bricks"></div>
+      <div class="plain"><div class="ph">🔰 先建立心態</div><p>這一章做的事一句話就講完：<strong>把「一串字元」變成「一疊向量」</strong>。中間每一步都只是簡單的機械操作——切開、查表、滑窗、再查表——但每一步的<b>形狀</b>都要看懂，因為第 3 章的 attention、第 5 章的訓練迴圈吃的就是這裡的輸出。順帶劇透：<b>第 5 章訓練用的 data loader，就是本章 2.6 親手寫出來的 <span class="en">create_dataloader_v1</span></b>。</p></div>
+      <h3>暖身：整條管線的數字流（本章全部親手算出）</h3>
+      <div class="stage"><div class="tsr"><span class="lbl"># 《The Verdict》短篇小說 → GPT 的輸入，五次變身（皆為書中真實數值）</span>
+① 原始文字      <span class="tn" style="font-weight:700">20,479</span> 個字元
+② 斷詞（2.2）    → <span class="tn" style="font-weight:700">4,690</span> 個 token（word-level，去空白）
+③ 建詞彙表（2.3）→ 排序去重 <span class="tn" style="font-weight:700">1,130</span> 個 → 每個 token 一個 ID
+④ BPE（2.5–2.6） → 換 GPT-2 斷詞器重切 → <span class="tn" style="font-weight:700">5,145</span> 個 token ID
+⑤ 滑動視窗（2.6）→ 切成 batch，形狀 <span class="tn" style="font-weight:700">[8, 4]</span>
+⑥ embedding（2.7–2.8）→ 查表＋位置 → <span class="tn" style="color:var(--accent);font-weight:700">[8, 4, 256]</span>  <span class="lbl"># ← 交棒給第 3 章</span></div></div>
+    </section>
+
+    <!-- ===== 2.1 ===== -->
+    <section id="sec-21" data-map="s-emb">
+      <div class="sh"><span class="num">2.1</span><h2>Understanding word embeddings（詞嵌入是什麼）</h2></div>
+      <div class="iocard"><span class="io in">input：離散資料<br>文字 / 圖片 / 聲音</span><span class="ioarrow">→</span><span class="io box">embedding 模型<small>把離散物件對應到連續向量空間的點</small></span><span class="ioarrow">→</span><span class="io out">output：向量<br>例如 [1.78, 0.18, -2.10]</span></div>
+      <p>深度神經網路（包括 LLM）沒辦法直接處理原始文字——文字是<strong>類別型</strong>（categorical）資料，跟矩陣乘法、梯度這些數學運算不相容。解法：把每個詞表示成<strong>連續值向量</strong>，這個「資料 → 向量」的轉換就叫 <span class="en">embedding</span>（嵌入）。影片、聲音也各有自己的 embedding 模型——但彼此不通用，文字的 embedding 模型沒辦法拿去嵌入聲音。</p>
+      <p>早期的經典做法是 <span class="en">Word2Vec</span>：用「猜上下文」的任務訓練出詞向量，核心直覺是——<strong>出現在相似上下文的詞，意思也相近</strong>。把高維向量投影到 2 維，就能看到「意思相近的詞聚在一起」。<strong>滑過下面的詞試試</strong>（位置為示意，依書中圖 2.3 重繪）：</p>
+      <div class="stage">
+        <div class="scat" id="scat"><span class="ax" style="left:10px;bottom:6px">第 1 維 →</span><span class="ax" style="left:6px;top:6px">↑ 第 2 維</span></div>
+        <div class="tsrnote" id="scatNote">滑過任何一個詞，看它的「語意鄰居」→</div>
+      </div>
+      <div class="plain"><div class="ph">🔰 那 LLM 也用 Word2Vec 嗎？</div><p>不用。LLM 的 embedding 是<b>模型輸入層的一部分，跟著訓練一起更新</b>——好處是向量會為「當前任務與資料」量身優化，而不是借用別人練好的通用向量。本章結尾（2.7–2.8）就會親手做出這層。維度也大得多：GPT-2 小模型每個詞 <b>768</b> 維、GPT-3（175B）達 <b>12,288</b> 維——遠超人類能想像的 2、3 維，但數學上就只是更長的一列數字。</p></div>
+      <p>接下來的路線：<strong>先把文字切成 token（2.2）→ token 轉成 ID（2.3–2.5）→ ID 查表變向量（2.7–2.8）</strong>。一步一步來。</p>
+    </section>
+
+    <!-- ===== 2.2 ===== -->
+    <section id="sec-22" data-map="s-raw,s-tok">
+      <div class="sh"><span class="num">2.2</span><h2>Tokenizing text（把文字斷成 token）</h2></div>
+      <div class="iocard"><span class="io in">input：原始文字<br>《The Verdict》20,479 字元</span><span class="ioarrow">→</span><span class="io box">re.split 斷詞器<small>以空白與標點切開 · 保留大小寫 · 去空白</small></span><span class="ioarrow">→</span><span class="io out">output：4,690 個 token<br>（單字與標點）</span></div>
+      <p>教材語料是 Edith Wharton 的公有領域短篇小說《The Verdict》。先讀進來看看規模——<strong>書中真實輸出：</strong></p>
+      <div class="stage"><div class="tsr"><span class="lbl"># with open("the-verdict.txt") as f: raw_text = f.read()</span>
+Total number of character: <span class="tn" style="color:var(--accent);font-weight:700">20479</span>
+<span class="lbl"># raw_text[:99] ——開頭長這樣：</span>
+I HAD always thought Jack Gisburn rather a cheap genius--though a good fellow
+     enough--so it was no</div></div>
+      <p>怎麼把它切成 token？書中用 Python 的 <code class="inl">re.split</code> 走了三個版本，一版比一版完整。<strong>切換版本、或直接改文字</strong>，斷詞結果即時重算（與 Python 行為一致）：</p>
+      <div class="stage">
+        <div class="controls">
+          <span class="seg" id="reSeg"><button data-m="0" class="on">① 只切空白</button><button data-m="1">② ＋逗號句號</button><button data-m="2">③ 完整標點（定版）</button></span>
+          <span style="flex:1"></span>
+          <button class="pill" data-ex="0">書中例句 A</button>
+          <button class="pill" data-ex="1">書中例句 B</button>
+          <button class="pill" data-ex="2">小說開頭</button>
+        </div>
+        <textarea id="reInput" rows="2">Hello, world. This, is a test.</textarea>
+        <div class="sent" id="reChips" style="margin-top:12px"></div>
+        <div class="tsr" id="reTsr" style="margin-top:8px"></div>
+        <div class="stepcap" id="reCap"></div>
+      </div>
+      <div class="note"><b>兩個容易忽略的設計決定：</b>① <b>不轉小寫</b>——大小寫能幫模型分辨專有名詞、理解句子結構；② <b>空白要不要留？</b>這裡為了精簡直接丟掉，但若任務對排版敏感（例如 Python 程式碼的縮排），空白就得保留。之後的 BPE 斷詞器（2.5）就是把空白編進 token 裡的。</div>
+      <p>把定版斷詞器套到整篇小說上：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># preprocessed = re.split(r'([,.:;?_!"()\']|--|\s)', raw_text) ＋ 去空白</span>
+len(preprocessed) = <span class="tn" style="color:var(--accent);font-weight:700">4690</span>   <span class="lbl"># 整篇小說共 4,690 個 token</span>
+<span class="lbl"># 前 30 個 token：</span>
+['I', 'HAD', 'always', 'thought', 'Jack', 'Gisburn', 'rather', 'a',
+ 'cheap', 'genius', '--', 'though', 'a', 'good', 'fellow', 'enough',
+ '--', 'so', 'it', 'was', 'no', 'great', 'surprise', 'to', 'me', 'to',
+ 'hear', 'that', ',', 'in']</div></div>
+    </section>
+
+    <!-- ===== 2.3 ===== -->
+    <section id="sec-23" data-map="s-tok,s-id">
+      <div class="sh"><span class="num">2.3</span><h2>Converting tokens into token IDs（token 轉成 ID）</h2></div>
+      <div class="iocard"><span class="io in">input：4,690 個 token<br>（字串）</span><span class="ioarrow">→</span><span class="io box">建 vocabulary ＋ 查表<small>sorted(set(...)) 排序去重 → token:ID 字典</small></span><span class="ioarrow">→</span><span class="io out">output：token ID<br>整數 0 – 1129</span></div>
+      <p>token 還是字串，模型要的是整數。做法：把全部 token <strong>去重、按字母排序</strong>，依序編號——這張「token → 整數」的對照表就是 <span class="en">vocabulary</span>（詞彙表）。《The Verdict》的 4,690 個 token 去重後剩 <b>1,130</b> 個：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># all_words = sorted(set(preprocessed)); vocab = {token:integer ...}</span>
+vocab_size = <span class="tn" style="color:var(--accent);font-weight:700">1130</span>
+<span class="lbl"># 前幾筆與第 50、51 筆（標點排最前面）：</span>
+('!', 0)   ('"', 1)   ("'", 2)   <span class="pn">...</span>   ('Her', 49)   ('Hermia', 50)</div></div>
+      <h3>查表實戰：SimpleTokenizerV1（書中真實數值）</h3>
+      <p>把「斷詞＋查表」包成一個類別，就是書中的 <span class="en">SimpleTokenizerV1</span>。拿小說裡的一句話 encode 看看——<strong>滑過任何一個 token 或 ID</strong>，看兩邊怎麼對應：</p>
+      <div class="stage">
+        <div class="sent" id="v1Chips"></div>
+        <div class="tsr" id="v1Tsr" style="margin-top:8px"></div>
+        <div class="tsrnote" id="v1Note">滑過上面任何一個 token 試試 →</div>
+      </div>
+      <h3>encode → decode 往返：文字真的回得來嗎？</h3>
+      <p><span class="en">encode</span>（文字→ID）之外還要有 <span class="en">decode</span>（ID→文字），之後模型的輸出才能變回人話。<strong>按「下一步」走完一趟往返：</strong></p>
+      <div class="stage">
+        <div class="tsr" id="rtTsr"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="rtPrev">← 上一步</button>
+          <button class="btn" id="rtNext">下一步 →</button>
+          <span class="dots" id="rtDots"></span>
+        </div>
+        <div class="stepcap" id="rtCap"></div>
+      </div>
+      <p>但 V1 有個致命弱點——vocab 是從《The Verdict》建的，<strong>沒出現過的詞它完全無能為力</strong>：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># 對訓練集以外的句子 encode（書中真實輸出）</span>
+text = "Hello, do you like tea?"
+tokenizer.encode(text)
+<span class="tn" style="color:var(--bad);font-weight:700">KeyError: 'Hello'</span>   <span class="lbl"># 《The Verdict》全文沒有 "Hello" 這個詞 → 查表直接爆炸</span></div></div>
+      <div class="note"><b>這不是小問題。</b>真實世界的輸入永遠會有 vocab 之外的詞（新詞、人名、錯字……）。下一節先用 <b>&lt;|unk|&gt;</b> 補丁擋著，2.5 節再看 GPT 的正解：BPE。</div>
+    </section>
+
+    <!-- ===== 2.4 ===== -->
+    <section id="sec-24" data-map="s-id">
+      <div class="sh"><span class="num">2.4</span><h2>Adding special context tokens（加入特殊 token）</h2></div>
+      <div class="iocard"><span class="io in">input：vocab 1,130 個</span><span class="ioarrow">→</span><span class="io box">＋ 兩個特殊 token<small>&lt;|endoftext|&gt;=1130 · &lt;|unk|&gt;=1131</small></span><span class="ioarrow">→</span><span class="io out">output：vocab 1,132 個<br>SimpleTokenizerV2</span></div>
+      <p>在 vocab 的最後面追加兩個「人造 token」：<span class="en">&lt;|unk|&gt;</span>（unknown——查不到表的詞一律換成它）與 <span class="en">&lt;|endoftext|&gt;</span>（文件邊界——訓練時常把多篇不相關的文件串成一長串，中間插上它，模型才知道「這裡換一篇了」）：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># all_tokens.extend(["&lt;|endoftext|&gt;", "&lt;|unk|&gt;"]) → 詞彙表最後五筆（書中真實輸出）</span>
+('younger', 1127)
+('your', 1128)
+('yourself', 1129)
+('<span class="tn" style="color:var(--accent);font-weight:700">&lt;|endoftext|&gt;</span>', <span class="tn" style="color:var(--accent);font-weight:700">1130</span>)
+('<span class="tn" style="color:var(--bad);font-weight:700">&lt;|unk|&gt;</span>', <span class="tn" style="color:var(--bad);font-weight:700">1131</span>)   <span class="lbl"># vocab_size：1130 → 1132</span></div></div>
+      <p>實測：把兩句<strong>互不相關</strong>的話用 <code class="inl">&lt;|endoftext|&gt;</code> 接起來，丟給 <span class="en">SimpleTokenizerV2</span>。<strong>滑過 token 或 ID</strong> 看對應——紅色是被換成 <span class="en">&lt;|unk|&gt;</span> 的詞：</p>
+      <div class="stage">
+        <div class="small" style="margin-bottom:8px">text = "Hello, do you like tea?" ＋ " &lt;|endoftext|&gt; " ＋ "In the sunlit terraces of the palace."</div>
+        <div class="sent" id="v2Chips"></div>
+        <div class="tsr" id="v2Tsr" style="margin-top:8px"></div>
+        <div class="tsrnote" id="v2Note">滑過任何一個 token 試試 →</div>
+        <div class="decoded" id="v2Dec"><span class="small lbl">decode(encode(text)) → </span>"<span class="bad2">&lt;|unk|&gt;</span>, do you like tea? <span class="nw">&lt;|endoftext|&gt;</span> In the sunlit terraces of the <span class="bad2">&lt;|unk|&gt;</span>."</div>
+        <div class="stepcap">「Hello」和「palace」不在《The Verdict》的詞彙表裡，encode 時被換成 1131——decode 回來就<b>永遠救不回原字</b>了。&lt;|unk|&gt; 是「不會爆炸」的補丁，但資訊有損。</div>
+      </div>
+      <div class="note"><b>其他常見特殊 token：</b><code class="inl">[BOS]</code>（序列開頭）、<code class="inl">[EOS]</code>（序列結尾，作用同 &lt;|endoftext|&gt;）、<code class="inl">[PAD]</code>（把一個 batch 裡長短不一的文字補到等長）。<b>GPT 全都不用</b>——只留一個 &lt;|endoftext|&gt;（連 padding 都拿它充當），也不需要 &lt;|unk|&gt;，因為它用的 BPE 斷詞器<b>根本不會遇到未知詞</b>。怎麼辦到的？下一節。</div>
+    </section>
+
+    <!-- ===== 2.5 ===== -->
+    <section id="sec-25" data-map="s-tok,s-id">
+      <div class="sh"><span class="num">2.5</span><h2>Byte pair encoding（BPE 子詞斷詞）</h2></div>
+      <div class="iocard"><span class="io in">input：任何文字<br>（含從沒見過的詞）</span><span class="ioarrow">→</span><span class="io box">tiktoken · GPT-2 BPE<small>詞彙表 50,257 · 罕見詞拆成子詞或字元</small></span><span class="ioarrow">→</span><span class="io out">output：token ID<br>永遠不會 OOV</span></div>
+      <p>GPT-2、GPT-3 與 ChatGPT 的原始模型用的都是 <span class="en">byte pair encoding</span>。自己實作太複雜，書中直接用 OpenAI 的開源庫 <code class="inl">tiktoken</code>（Rust 核心，本書用 0.7.0 版）。它的 vocab 有 <b>50,257</b> 個 token，其中 <code class="inl">&lt;|endoftext|&gt;</code> 被排在<strong>最大的 ID：50256</strong>。拿一句故意夾帶怪詞 <code class="inl">someunknownPlace</code> 的話實測——<strong>滑過 token 或 ID</strong>（␣ 代表 token 自帶的空白）：</p>
+      <div class="stage">
+        <div class="small" style="margin-bottom:8px">tokenizer = tiktoken.get_encoding("gpt2")　·　書中真實輸出</div>
+        <div class="sent" id="bpeChips"></div>
+        <div class="tsr" id="bpeTsr" style="margin-top:8px"></div>
+        <div class="tsrnote" id="bpeNote">滑過任何一個 token 試試 →</div>
+        <div class="decoded"><span class="small lbl">tokenizer.decode(integers) → </span>"Hello, do you like tea? <span class="nw">&lt;|endoftext|&gt;</span> In the sunlit terraces of someunknownPlace."<span class="small">　✓ 一字不差還原，沒有任何 &lt;|unk|&gt;</span></div>
+      </div>
+      <div class="note"><b>看懂兩件事：</b>① 「Hello」在 V1 會 KeyError、在 V2 變 &lt;|unk|&gt;，在 BPE 裡卻是<b>一個好好的 token（15496）</b>——它的詞彙表大得多；② 從沒見過的 <code class="inl">someunknownPlace</code> 被拆成 <b>␣some + unknown + Place</b> 三個「子詞」——查不到整個詞，就用已知的零件拼。零件拆到最細是單一字元，所以<b>任何字串都拼得出來</b>，永遠不需要 &lt;|unk|&gt;。</div>
+      <h3>練習 2.1：拆解 "Akwirw ier"（書中習題）</h3>
+      <p>兩個完全是亂打的「詞」，BPE 也照吃。<strong>按「解碼下一個」</strong>，逐個揭曉每個 ID 對應的子詞：</p>
+      <div class="stage">
+        <div class="controls"><span class="small">tokenizer.encode("Akwirw ier")</span><span style="flex:1"></span>
+          <button class="btn" id="akNext">解碼下一個 →</button>
+          <button class="btn ghost" id="akAll">全部揭曉</button>
+          <button class="btn ghost" id="akReset">重來</button>
+        </div>
+        <div class="sent" id="akChips"></div>
+        <div class="stepcap" id="akCap"></div>
+      </div>
+      <div class="note"><b>BPE 是怎麼練出來的？</b>從「每個字元都是一個 token」起步，反覆<b>把最常一起出現的相鄰字對合併成新 token</b>：像 d + e → de（define、depend、made、hidden 都有它），再把常見子詞合併成整詞。合併多少由頻率門檻決定——常見詞最後是一個 token，罕見詞就停在子詞階段。</div>
+    </section>
+
+    <!-- ===== 2.6 ===== -->
+    <section id="sec-26" data-map="s-win">
+      <div class="sh"><span class="num">2.6</span><h2>Data sampling with a sliding window（滑動視窗取樣）</h2></div>
+      <div class="iocard"><span class="io in">input：BPE 後的全文<br>5,145 個 token ID</span><span class="ioarrow">→</span><span class="io box">GPTDatasetV1 ＋ DataLoader<small>max_length · stride · batch_size · 滑動視窗</small></span><span class="ioarrow">→</span><span class="io out">output：(inputs, targets)<br>兩個 [8, 4] tensor</span></div>
+      <p>LLM 的預訓練任務是「預測下一個 token」，所以訓練資料是一對對 <strong>(input, target)</strong>：input 是一段 token、target 是<strong>同一段右移一格</strong>。先把整篇《The Verdict》用 BPE 重新編碼：word-level 是 4,690 個 token，BPE 則得到 <b>5,145</b> 個（子詞拆分讓數量變多）。書中再跳過前 50 個 token 取 <code class="inl">enc_sample = enc_text[50:]</code>，示範 <code class="inl">context_size=4</code> 時的四個預測任務——<strong>按「下一步」逐一展開（真實數值）：</strong></p>
+      <div class="stage">
+        <div class="tape" id="xyTape"></div>
+        <div class="tsr" id="xyTsr"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="xyPrev">← 上一步</button>
+          <button class="btn" id="xyNext">下一步 →</button>
+          <span class="dots" id="xyDots"></span>
+        </div>
+        <div class="stepcap" id="xyCap"></div>
+      </div>
+      <div class="plain"><div class="ph">🔰 一個視窗＝好幾筆訓練樣本</div><p>x = [290, 4920, 2241, 287]、y = [4920, 2241, 287, 257] 這一對，訓練時會同時當 <b>4 筆</b>「已知前文 → 猜下一個」的題目用（上面四步就是那 4 筆）。模型看不到 target 右邊的字——這個「只准看左邊」的規則，就是第 3 章 causal attention mask 要實作的事。</p></div>
+      <h3>親手滑一次視窗：max_length 與 stride</h3>
+      <p>資料集類別 <span class="en">GPTDatasetV1</span> 用兩個參數控制切法：<code class="inl">max_length</code>（視窗長度）與 <code class="inl">stride</code>（每次滑多遠）。下面的磁帶是《The Verdict》開頭經 BPE 的<strong>真實前 33 個 token ID</strong>——拖動滑桿、按「下一個視窗」實際滑滑看：</p>
+      <div class="stage">
+        <div class="controls" style="gap:14px">
+          <span class="small">max_length = <b id="mlVal" style="color:var(--accent)">4</b></span>
+          <input type="range" id="mlSlider" min="1" max="8" step="1" value="4" style="width:140px">
+          <span class="small">stride = <b id="stVal" style="color:var(--accent)">1</b></span>
+          <input type="range" id="stSlider" min="1" max="8" step="1" value="1" style="width:140px">
+          <span style="flex:1"></span>
+          <button class="btn ghost" id="winPrev">◀</button>
+          <button class="btn" id="winNext">下一個視窗 ▶</button>
+        </div>
+        <div class="tape" id="winTape"></div>
+        <div class="winleg"><span><i style="background:color-mix(in srgb,var(--accent) 24%,var(--surface-2));border:1px solid var(--accent)"></i>input 視窗</span><span><i style="background:var(--surface-2);box-shadow:inset 0 -3px 0 var(--cool)"></i>target（右移一格）</span></div>
+        <div class="tsr" id="winTsr" style="margin-top:8px"></div>
+        <div class="stepcap" id="winCap"></div>
+      </div>
+      <p>最後用 PyTorch 的 <span class="en">DataLoader</span> 把視窗兩兩打包成 batch。書中用 <code class="inl">batch_size=8, max_length=4, stride=4</code> 取出第一個 batch——<strong>滑過任何一列</strong>，看 input 列與 target 列的對應（真實輸出）：</p>
+      <div class="stage">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:280px"><div class="small" style="margin-bottom:6px">Inputs（[8, 4]）</div><div class="tsr" id="bIn"></div></div>
+          <div style="flex:1;min-width:280px"><div class="small" style="margin-bottom:6px">Targets（[8, 4]）</div><div class="tsr" id="bTg"></div></div>
+        </div>
+        <div class="stepcap" id="bCap">👆 滑過任何一列：target 永遠是同一列 input 右移一格</div>
+      </div>
+      <div class="note"><b>為什麼 stride=4？</b>stride＝max_length 時視窗<b>不重疊也不跳過</b>，資料用好用滿；stride 太小則相鄰樣本高度重疊，訓練時等於一直看重複內容，可能加重 overfitting。另外 <code class="inl">drop_last=True</code> 會把湊不滿 batch 的尾巴丟掉，避免訓練尾端出現 loss 突刺——這些設定第 5 章的訓練迴圈全部沿用。</div>
+    </section>
+
+    <!-- ===== 2.7 ===== -->
+    <section id="sec-27" data-map="s-emb">
+      <div class="sh"><span class="num">2.7</span><h2>Creating token embeddings（做出 token embedding）</h2></div>
+      <div class="iocard"><span class="io in">input：token ID<br>tensor([2, 3, 5, 1])</span><span class="ioarrow">→</span><span class="io box">nn.Embedding(6, 3) 查表<small>torch.manual_seed(123) · 權重隨機初始化、可訓練</small></span><span class="ioarrow">→</span><span class="io out">output：向量<br>形狀 [4, 3]</span></div>
+      <p>ID 只是編號，真正進模型的是向量。<span class="en">nn.Embedding</span> 說穿了就是<strong>一張表：每個 ID 對應一列隨機初始化的向量</strong>，訓練時由反向傳播慢慢調整。書中用迷你例子示範：詞彙表只有 6 個 token、每列 3 維。<strong>點下面任一個 ID</strong>，看查表怎麼運作（矩陣為 seed 123 的真實權重）：</p>
+      <div class="stage">
+        <div class="controls">
+          <span class="small">embedding_layer(torch.tensor([ ? ]))　點一個 ID：</span>
+          <button class="pill" data-id="0">0</button><button class="pill" data-id="1">1</button><button class="pill" data-id="2">2</button><button class="pill on" data-id="3">3</button><button class="pill" data-id="4">4</button><button class="pill" data-id="5">5</button>
+          <button class="pill" id="embSeq">整串 [2, 3, 5, 1]</button>
+        </div>
+        <div class="tsr" id="embW"></div>
+        <div class="tsr" id="embOut" style="margin-top:8px"></div>
+        <div class="stepcap" id="embCap"></div>
+      </div>
+      <div class="plain"><div class="ph">🔰 embedding 就是「可訓練的查表」</div><p>ID 3 → 取出權重矩陣的<b>第 4 列</b>（index 從 0 起算）——就這樣，沒有更多魔法。它在數學上等價於「one-hot 向量 × 權重矩陣」的矩陣乘法，查表只是高效實作；也因為等價於矩陣乘法，它是<b>可以被反向傳播優化的神經網路層</b>。第 5 章訓練時，這張表的每個數字都會被更新。</p></div>
+      <p>實戰尺寸只是把表開大：詞彙表 50,257（BPE）× 每列 256 維（書中教學用；GPT-3 用 12,288 維）——光這張表就有 50257 × 256 ≈ <b>1,286 萬</b>個可訓練參數（換算值）。</p>
+    </section>
+
+    <!-- ===== 2.8 ===== -->
+    <section id="sec-28" data-map="s-pos,s-mdl">
+      <div class="sh"><span class="num">2.8</span><h2>Encoding word positions（把位置編進向量）</h2></div>
+      <div class="iocard"><span class="io in">input：token_embeddings<br>[8, 4, 256]</span><span class="ioarrow">→</span><span class="io box">＋ pos_embeddings [4, 256]<small>依位置查另一張表 · broadcast 相加</small></span><span class="ioarrow">→</span><span class="io out">output：input_embeddings<br>[8, 4, 256] → 進 GPT</span></div>
+      <p>token embedding 有個特性：<strong>同一個 ID 不管出現在句子第幾個位置，查到的向量一模一樣</strong>。用書中圖 2.17 的例子（token 序列 [2, 3, 5, 2]，首尾都是 2）——<strong>滑過下面的 token</strong>：</p>
+      <div class="stage">
+        <div class="sent" id="posChips"></div>
+        <div class="tsr" id="posTsr"></div>
+        <div class="tsrnote" id="posNote">滑過任何一個 token（注意首尾兩個 ID 2）→</div>
+      </div>
+      <p>而 LLM 的 self-attention 本身也<strong>沒有順序概念</strong>（第 3 章會看到原因）——「A 咬 B」和「B 咬 A」不能是同一句話，所以要把位置資訊補進向量。GPT 的做法是 <span class="en">absolute positional embedding</span>：<strong>再開一張表，這次用「位置」當索引查</strong>（位置 0 一列、位置 1 一列……），查出來的向量直接加到 token embedding 上，而且同樣可訓練。<strong>按「下一步」，把本章的最終輸出組出來（形狀皆為書中真實輸出）：</strong></p>
+      <div class="stage">
+        <div class="tsr" id="finTsr"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="finPrev">← 上一步</button>
+          <button class="btn" id="finNext">下一步 →</button>
+          <span class="dots" id="finDots"></span>
+        </div>
+        <div class="stepcap" id="finCap"></div>
+      </div>
+      <div class="note"><b>相對式位置編碼是另一派：</b>不記「我在第幾格」，改記「兩個 token 相距多遠」，對沒看過的長度較容易泛化。GPT 系列選的是絕對式＋可訓練——讓模型自己學出最適合資料的位置表示。本頁做出的 <code class="inl">input_embeddings [8, 4, 256]</code> 就是第 3 章 attention 機制的直接輸入。</div>
+    </section>
+
+    <!-- ===== 小結 ===== -->
+    <section id="sec-sum" data-map="all">
+      <div class="sh"><span class="num">▣</span><h2>本章小結</h2></div>
+      <ul class="clean">
+        <li><b>Embedding</b>＝把離散資料（詞）對應到連續向量空間的點；LLM 的 embedding 是輸入層的一部分、隨訓練更新（GPT-2 small 768 維、GPT-3 12,288 維）。</li>
+        <li><b>斷詞</b>：re.split 以空白與標點切開、保留大小寫；《The Verdict》20,479 字元 → 4,690 個 word-level token。</li>
+        <li><b>Vocabulary</b>：排序去重得 1,130 個 token、各配一個 ID；SimpleTokenizerV1 能 encode/decode，但遇到 vocab 外的詞（"Hello"）直接 KeyError。</li>
+        <li><b>特殊 token</b>：V2 加 &lt;|endoftext|&gt;（ID 1130，文件邊界）與 &lt;|unk|&gt;（ID 1131）；GPT 實際只用 &lt;|endoftext|&gt;（連 padding 也用它）。</li>
+        <li><b>BPE</b>：GPT-2 的斷詞器，詞彙表 50,257；未知詞拆成子詞或字元（someunknownPlace → some+unknown+Place），永遠不會 OOV。</li>
+        <li><b>Sliding window</b>：target＝input 右移一格；stride=max_length 時不重疊不遺漏；create_dataloader_v1 產出 [8, 4] 的 inputs/targets——第 5 章訓練直接用它。</li>
+        <li><b>兩張表相加</b>：token embedding（查 ID）＋ positional embedding（查位置）→ input_embeddings [8, 4, 256]，交棒給第 3 章的 attention。</li>
+      </ul>
+    </section>
+
+    <section id="sec-quiz" data-map="all">
+      <div class="sh"><span class="num">✓</span><h2>知識檢核</h2></div>
+      <p class="small" style="margin-bottom:14px">// 七題，作答後立即看解析</p>
+      <div class="quiz" id="quizBox"></div>
+      <div id="score" style="font-family:var(--mono);font-size:14px;color:var(--accent);margin-top:16px"></div>
+    </section>
+
+    <div class="foot">從零打造 LLM · 第 2 章互動教材 ｜ 講解為原創文字，程式碼與數值對應 Sebastian Raschka《Build a Large Language Model (From Scratch)》Ch.2 的公開程式與執行輸出，非原文翻譯<br>頁面中的計算皆為瀏覽器即時運算　·　快捷鍵 <kbd>T</kbd> 切換主題</div>
+  </main>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const root=document.documentElement;
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+$("#themeBtn").addEventListener("click",()=>{const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",cur==="dark"?"light":"dark");});
+addEventListener("keydown",e=>{if(e.target.matches&&e.target.matches("input,textarea"))return;if(e.key==="t"||e.key==="T")$("#themeBtn").click();});
+
+/* ===== 全域資料管線圖 ===== */
+const STAGES=[
+ {id:"s-raw",em:"📝",label:"原始文字"},{id:"s-tok",em:"✂️",label:"Token"},{id:"s-id",em:"🔢",label:"Token ID"},
+ {id:"s-win",em:"🪟",label:"滑動視窗"},{id:"s-emb",em:"▦",label:"Token Emb"},{id:"s-pos",em:"📍",label:"+Position"},
+ {id:"s-mdl",em:"🧠",label:"準備進模型"}];
+$("#mapRow").innerHTML=STAGES.map((s,i)=>`<div class="mapstage" data-id="${s.id}"><span class="em">${s.em}</span>${s.label}</div>`+(i<STAGES.length-1?'<span class="mapsep">›</span>':'<span class="mapsep">⇢ ch3</span>')).join("");
+$$(".mapstage").forEach(el=>el.addEventListener("click",()=>{const sec=[...$$("section")].find(s=>{const m=s.dataset.map||"";return m!=="all"&&m.split(",").includes(el.dataset.id);});if(sec){sec.scrollIntoView();}else{document.getElementById("sec-intro").scrollIntoView();}}));
+function setMap(sec){
+  const raw=(sec&&sec.dataset.map)||"all";
+  const ids=raw==="all"?STAGES.map(s=>s.id):raw.split(",");
+  $$(".mapstage").forEach(el=>el.classList.toggle("lit",ids.includes(el.dataset.id)));
+  if(raw==="all"){$("#mapSub").innerHTML=`資料準備管線：原始文字 → token → ID → 滑動視窗取樣 → embedding ＋ 位置 → [8,4,256] 送進 GPT（第 3 章接手）`;}
+  else{const lbls=ids.map(id=>STAGES.find(s=>s.id===id).label);$("#mapSub").innerHTML=`目前在：<b>${lbls.join(" · ")}</b>`;}
+}
+
+/* ===== 積木進度（8 步驟）===== */
+const BRICKS=[["1","認識 embedding","sec-21"],["2","斷詞 tokenize","sec-22"],["3","建 vocab、轉 ID","sec-23"],["4","特殊 token","sec-24"],["5","BPE 子詞","sec-25"],["6","滑動視窗取樣","sec-26"],["7","token embedding","sec-27"],["8","加上位置","sec-28"]];
+$("#bricks").innerHTML=BRICKS.map(b=>`<div class="brick" data-sec="${b[2]}"><span class="ck"></span><span><b>${b[0]}</b> ${b[1]}</span></div>`).join("");
+$$(".brick").forEach(el=>el.addEventListener("click",()=>document.getElementById(el.dataset.sec).scrollIntoView()));
+const SEC_ORDER=["sec-intro","sec-21","sec-22","sec-23","sec-24","sec-25","sec-26","sec-27","sec-28","sec-sum","sec-quiz"];
+function setBricks(curId){
+  const cur=SEC_ORDER.indexOf(curId);
+  $$(".brick").forEach(el=>{
+    const bi=SEC_ORDER.indexOf(el.dataset.sec);
+    el.classList.toggle("done",cur>bi);
+    el.classList.toggle("now",el.dataset.sec===curId);
+    el.querySelector(".ck").textContent=el.classList.contains("done")?"✓":"";
+  });
+}
+
+/* nav + prog + map + bricks */
+const secs=$$("section, .hero"),links=$$("nav.toc a");
+function onScroll(){
+  const h=document.documentElement;$("#prog").style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+"%";
+  let cur=secs[0];for(const s of secs)if(s.getBoundingClientRect().top<=150)cur=s;
+  links.forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+cur.id));
+  setMap(cur.tagName==="SECTION"?cur:null);
+  setBricks(cur.id);
+}
+addEventListener("scroll",onScroll,{passive:true});onScroll();
+
+/* ===== 2.1 embedding 空間散點（示意，依圖 2.3 重繪）===== */
+const SCAT=[
+ {w:"eagle",x:24,y:22,g:"bird"},{w:"duck",x:38,y:14,g:"bird"},{w:"goose",x:33,y:28,g:"bird"},
+ {w:"squirrel",x:54,y:20,g:"near"},
+ {w:"Germany",x:12,y:52,g:"geo"},{w:"Berlin",x:23,y:46,g:"geo"},{w:"England",x:14,y:64,g:"geo"},{w:"London",x:27,y:58,g:"geo"},
+ {w:"long",x:60,y:52,g:"cmp"},{w:"longer",x:70,y:48,g:"cmp"},{w:"longest",x:78,y:54,g:"cmp"}];
+const SCAT_NOTE={
+ bird:"<b>鳥類</b>（eagle · duck · goose）擠在同一區——Word2Vec 從「牠們常出現在相似句子裡」學到這件事，沒有人告訴它什麼是鳥。",
+ near:"<b>squirrel（松鼠）</b>也是動物，落在鳥群附近——但不在圈內：相似而不相同，距離就是語意。",
+ geo:"<b>國家與城市</b>（Germany · Berlin · England · London）自成一區，而且 Germany→Berlin 和 England→London 的相對位置也相似——「首都關係」變成了向量方向。",
+ cmp:"<b>比較級</b>（long · longer · longest）排成一列——形態學規律也會反映在向量空間裡。"};
+$("#scat").innerHTML+=SCAT.map((d,i)=>`<span class="sw" data-g="${d.g}" style="left:${d.x}%;top:${d.y}%">${d.w}</span>`).join("");
+$$("#scat .sw").forEach(el=>{
+  el.addEventListener("mouseenter",()=>{
+    const g=el.dataset.g;
+    $$("#scat .sw").forEach(x=>{x.classList.toggle("hot",x.dataset.g===g);x.classList.toggle("dim",x.dataset.g!==g);});
+    $("#scatNote").innerHTML=SCAT_NOTE[g];
+  });
+  el.addEventListener("mouseleave",()=>{
+    $$("#scat .sw").forEach(x=>{x.classList.remove("hot","dim");});
+    $("#scatNote").textContent="滑過任何一個詞，看它的「語意鄰居」→";
+  });
+});
+
+/* ===== 2.2 斷詞實驗器（與 Python re.split 行為一致）===== */
+const RE_MODES=[
+ {re:/(\s)/,strip:false,code:"re.split(r'(\\s)', text)",cap:"<b>版本①</b>：只在空白處切。標點還黏在詞上（'Hello,'）——「Hello,」和「Hello」會被當成兩個不同的 token，vocab 會被撐爆。"},
+ {re:/([,.]|\s)/,strip:true,code:"re.split(r'([,.]|\\s)', text)　＋ 去除空字串與空白",cap:"<b>版本②</b>：逗號與句號也當切點（用捕捉群組留下來），再把空字串/空白濾掉——標點獨立成 token 了，但問號、引號、雙破折號還沒處理。"},
+ {re:/([,.:;?_!"()']|--|\s)/,strip:true,code:"re.split(r'([,.:;?_!\"()\\']|--|\\s)', text)　＋ 去除空字串與空白",cap:"<b>版本③（定版）</b>：完整標點集＋雙破折號。這就是套用到整篇《The Verdict》的斷詞器——4,690 個 token 由它切出。"}];
+let reMode=0;
+const RE_EX=["Hello, world. This, is a test.","Hello, world. Is this-- a test?","I HAD always thought Jack Gisburn rather a cheap genius--though a good fellow enough--so it was no"];
+const pyRepr=s=>s.includes("'")?'"'+s+'"':"'"+s+"'";
+function renderRE(){
+  const m=RE_MODES[reMode];
+  const txt=$("#reInput").value;
+  const raw=txt.split(m.re);
+  const fin=m.strip?raw.map(t=>t.trim()).filter(t=>t.length>0):raw;
+  const PUN=new Set([",",".",":",";","?","_","!",'"',"(",")","'","--"]);
+  $("#reChips").innerHTML=fin.filter(t=>t!=="").slice(0,80).map(t=>{
+    const isWs=/^\s+$/.test(t);
+    const cls=isWs?"":(PUN.has(t)?" punct":"");
+    return `<span class="wchip${cls}">${isWs?"␣":esc(t)}</span>`;
+  }).join("")+(fin.length>80?`<span class="wchip">…共 ${fin.length} 個</span>`:"");
+  let out=`<span class="lbl"># ${esc(m.code)}</span>\n`;
+  if(m.strip)out+=`<span class="lbl"># split 原始結果（含空字串 '' 與空白）：</span>\n[${raw.slice(0,40).map(t=>esc(pyRepr(t))).join(", ")}${raw.length>40?", …":""}]\n<span class="lbl"># 濾掉之後：</span>\n`;
+  out+=`[${fin.slice(0,40).map(t=>esc(pyRepr(t))).join(", ")}${fin.length>40?", …":""}]`;
+  $("#reTsr").innerHTML=out;
+  $("#reCap").innerHTML=m.cap+`　<b>→ ${fin.length} 個 token</b>`;
+}
+$("#reInput").addEventListener("input",renderRE);
+$$("#reSeg button").forEach(b=>b.addEventListener("click",()=>{$$("#reSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");reMode=+b.dataset.m;renderRE();}));
+$$("[data-ex]").forEach(b=>b.addEventListener("click",()=>{$("#reInput").value=RE_EX[+b.dataset.ex];renderRE();}));
+renderRE();
+
+/* ===== 2.3 SimpleTokenizerV1 查表 hover（書中真實數值）===== */
+const V1T=[['"',1],["It",56],["'",2],["s",850],["the",988],["last",602],["he",533],["painted",746],[",",5],["you",1126],["know",596],[",",5],['"',1],["Mrs",67],[".",7],["Gisburn",38],["said",851],["with",1108],["pardonable",754],["pride",793],[".",7]];
+function hiV1(k){
+  $$("#v1Chips .wchip, #v1Tsr .tn").forEach(el=>el.classList.toggle("hot",k!==null&&+el.dataset.k===k));
+  if(k!==null){
+    const t=V1T[k];
+    const same=V1T.filter(x=>x[1]===t[1]).length;
+    $("#v1Note").innerHTML=`「<b>${esc(t[0])}</b>」→ ID <b>${t[1]}</b>（在 1,130 個排序後 token 中的位置）${same>1?`——這句裡出現 ${same} 次，每次都查到同一個 ID`:""}。標點排序在字母前，所以 ID 很小。`;
+  } else $("#v1Note").textContent="滑過上面任何一個 token 試試 →";
+}
+$("#v1Chips").innerHTML=V1T.map((t,i)=>`<span class="wchip" data-k="${i}">${esc(t[0])}<small>${t[1]}</small></span>`).join("");
+$("#v1Tsr").innerHTML=`<span class="lbl"># tokenizer.encode(text) —— 書中真實輸出</span>\n[${V1T.map((t,i)=>`<span class="tn" data-k="${i}">${t[1]}</span>`).join('<span class="pn">, </span>')}]`;
+$$("#v1Chips .wchip, #v1Tsr .tn").forEach(el=>{
+  el.addEventListener("mouseenter",()=>hiV1(+el.dataset.k));
+  el.addEventListener("mouseleave",()=>hiV1(null));
+});
+hiV1(null);
+
+/* ===== 2.3 encode→decode 往返 stepper ===== */
+const RT_STEPS=5;let rtStep=0;
+function renderRT(){
+  let h=`<span class="lbl"># 原文（《The Verdict》裡的一句話）</span>\ntext = """It's the last he painted, you know,"\n       Mrs. Gisburn said with pardonable pride."""`;
+  if(rtStep>=1)h+=`\n\n<span class="lbl"># step 1 — re.split 斷詞（版本③）→ 21 個 token</span>\n['"', 'It', "'", 's', 'the', 'last', 'he', 'painted', ',', 'you', 'know',\n ',', '"', 'Mrs', '.', 'Gisburn', 'said', 'with', 'pardonable', 'pride', '.']`;
+  if(rtStep>=2)h+=`\n\n<span class="lbl"># step 2 — str_to_int 逐個查表 → token ID（書中真實輸出）</span>\nids = [<span class="tn" style="color:var(--accent)">1, 56, 2, 850, 988, 602, 533, 746, 5, 1126, 596, 5, 1, 67, 7, 38,\n 851, 1108, 754, 793, 7</span>]`;
+  if(rtStep>=3)h+=`\n\n<span class="lbl"># step 3 — decode：int_to_str 查回字串，" ".join 用空白黏起來</span>\n'" It \' s the last he painted , you know , " Mrs . Gisburn said with\n pardonable pride .'   <span class="lbl"># 標點前多了空白，還不算還原</span>`;
+  if(rtStep>=4)h+=`\n\n<span class="lbl"># step 4 — re.sub(r'\\s+([,.?!"()\\'])', r'\\1', text) 把標點前的空白吸掉（書中真實輸出）</span>\n'" It\' s the last he painted, you know," Mrs. Gisburn said with\npardonable pride.'   <span class="tn" style="color:var(--accent);font-weight:700">✓ 幾乎完全還原</span>`;
+  $("#rtTsr").innerHTML=h;
+  const caps=[
+   "<b>step 0</b>：起點是一段普通文字。目標：encode 成 ID、再 decode 回來，驗證資訊沒有遺失。",
+   "<b>step 1</b>：斷詞。注意 It's 被拆成 It / ' / s 三個 token——單引號是切點。",
+   "<b>step 2</b>：查表。21 個 token → 21 個整數。這串數字就是模型「看到」的句子。",
+   "<b>step 3</b>：反向查表＋join。缺點立現：標點前面多了空白（\" Mrs . \"）——join 是無腦塞空白的。",
+   "<b>step 4</b>：用正規表達式把標點前的空白吸回去，輸出幾乎與原文相同。（吹毛求疵：It' s 中間的空白救不回來——斷詞時丟掉的資訊，decode 無法無中生有。）"];
+  $("#rtCap").innerHTML=caps[rtStep];
+  $("#rtDots").innerHTML=Array.from({length:RT_STEPS},(_,i)=>`<span class="dot2 ${i===rtStep?'on':''}"></span>`).join("");
+  $("#rtPrev").disabled=rtStep===0;$("#rtNext").disabled=rtStep===RT_STEPS-1;
+}
+$("#rtNext").addEventListener("click",()=>{if(rtStep<RT_STEPS-1){rtStep++;renderRT();}});
+$("#rtPrev").addEventListener("click",()=>{if(rtStep>0){rtStep--;renderRT();}});
+renderRT();
+/* ===== 2.4 SimpleTokenizerV2 hover（書中真實數值）===== */
+const V2T=[["Hello",1131,"unk"],[",",5,""],["do",355,""],["you",1126,""],["like",628,""],["tea",975,""],["?",10,""],["<|endoftext|>",1130,"eot"],["In",55,""],["the",988,""],["sunlit",956,""],["terraces",984,""],["of",722,""],["the",988,""],["palace",1131,"unk"],[".",7,""]];
+function hiV2(k){
+  $$("#v2Chips .wchip, #v2Tsr .tn").forEach(el=>el.classList.toggle("hot",k!==null&&+el.dataset.k===k));
+  if(k!==null){
+    const t=V2T[k];
+    $("#v2Note").innerHTML=t[2]==="unk"?`「<b>${esc(t[0])}</b>」不在 1,132 個 token 的詞彙表裡 → V2 不再爆炸，改換成 <b style="color:var(--bad)">&lt;|unk|&gt;（ID 1131）</b>。`
+      :t[2]==="eot"?`<b>&lt;|endoftext|&gt;（ID 1130）</b>——不是文章裡的字，是我們插進去的「換篇標記」，告訴模型前後兩句互不相關。`
+      :`「<b>${esc(t[0])}</b>」→ ID <b>${t[1]}</b>，正常查表。`;
+  } else $("#v2Note").textContent="滑過任何一個 token 試試 →";
+}
+$("#v2Chips").innerHTML=V2T.map((t,i)=>`<span class="wchip ${t[2]}" data-k="${i}">${esc(t[0])}<small>${t[2]==="unk"?"→ &lt;|unk|&gt; "+t[1]:t[1]}</small></span>`).join("");
+$("#v2Tsr").innerHTML=`<span class="lbl"># SimpleTokenizerV2 的 encode 結果（書中真實輸出）</span>\n[${V2T.map((t,i)=>`<span class="tn" data-k="${i}" ${t[2]==="unk"?'style="color:var(--bad);font-weight:700"':t[2]==="eot"?'style="color:var(--accent);font-weight:700"':''}>${t[1]}</span>`).join('<span class="pn">, </span>')}]`;
+$$("#v2Chips .wchip, #v2Tsr .tn").forEach(el=>{
+  el.addEventListener("mouseenter",()=>hiV2(+el.dataset.k));
+  el.addEventListener("mouseleave",()=>hiV2(null));
+});
+hiV2(null);
+
+/* ===== 2.5 BPE hover（書中真實數值）===== */
+const BPET=[["Hello",15496,""],[",",11,""],["␣do",466,""],["␣you",345,""],["␣like",588,""],["␣tea",8887,""],["?",30,""],["␣",220,"sp"],["<|endoftext|>",50256,"eot"],["␣In",554,""],["␣the",262,""],["␣sun",4252,"g1"],["lit",18250,"g1"],["␣terr",8812,"g2"],["aces",2114,"g2"],["␣of",286,""],["␣some",617,"g3"],["unknown",34680,"g3"],["Place",27271,"g3"],[".",13,""]];
+const BPE_GNOTE={g1:"「sunlit」不夠常見，BPE 的詞彙表裡沒有整個詞 → 拆成 <b>␣sun ＋ lit</b> 兩個子詞。",g2:"「terraces」同樣拆成 <b>␣terr ＋ aces</b>。",g3:"「someunknownPlace」訓練資料裡從沒出現過 → 用三個已知零件 <b>␣some ＋ unknown ＋ Place</b> 拼出來——這就是 BPE 永不 OOV 的原因。",sp:"單獨一個空白也是 token（ID 220）——書中例句在 &lt;|endoftext|&gt; 前後各留了空白。",eot:"<b>&lt;|endoftext|&gt; 的 ID 是 50256——GPT-2 詞彙表（共 50,257 個）裡最大的一個</b>。"};
+const bpeG=i=>BPET[i][2]||"i"+i;
+function hiBPE(k){
+  const hg=k===null?null:bpeG(k);
+  $$("#bpeChips .wchip, #bpeTsr .tn").forEach(el=>el.classList.toggle("hot",hg!==null&&bpeG(+el.dataset.k)===hg));
+  if(k!==null){
+    const t=BPET[k];
+    $("#bpeNote").innerHTML=BPE_GNOTE[t[2]]||`「<b>${esc(t[0])}</b>」→ ID <b>${t[1]}</b>${t[0].startsWith("␣")?"（␣＝token 自帶前導空白——BPE 把空白編進 token，不會丟資訊）":""}。`;
+  } else $("#bpeNote").textContent="滑過任何一個 token 試試 →";
+}
+$("#bpeChips").innerHTML=BPET.map((t,i)=>`<span class="wchip ${t[2]==="eot"?"eot":""}" data-k="${i}">${esc(t[0])}<small>${t[1]}</small></span>`).join("");
+$("#bpeTsr").innerHTML=`<span class="lbl"># tokenizer.encode(text, allowed_special={"&lt;|endoftext|&gt;"})（書中真實輸出）</span>\n[${BPET.map((t,i)=>`<span class="tn" data-k="${i}">${t[1]}</span>`).join('<span class="pn">, </span>')}]`;
+$$("#bpeChips .wchip, #bpeTsr .tn").forEach(el=>{
+  el.addEventListener("mouseenter",()=>hiBPE(+el.dataset.k));
+  el.addEventListener("mouseleave",()=>hiBPE(null));
+});
+hiBPE(null);
+
+/* ===== 2.5 Akwirw ier 練習（書中圖 2.11 真實數值）===== */
+const AKT=[["Ak",33901],["w",86],["ir",343],["w",86],["␣",220],["ier",959]];
+let akN=0;
+const AK_CAPS=[
+ "encode 得到 6 個 ID：[33901, 86, 343, 86, 220, 959]——每個對應什麼子詞？按「解碼下一個」逐個揭曉。",
+ "① 33901 → <b>\"Ak\"</b>：兩個字元的子詞。",
+ "② 86 → <b>\"w\"</b>：拆到最細就是單一字元——單字元一定在詞彙表裡，這是「永不 OOV」的保底。",
+ "③ 343 → <b>\"ir\"</b>。",
+ "④ 86 → 又是 <b>\"w\"</b>！同一個子詞不管出現在哪，永遠同一個 ID。",
+ "⑤ 220 → <b>空白</b>自己一個 token。",
+ "⑥ 959 → <b>\"ier\"</b>。六塊零件到齊。",
+ "最後驗證：<b>tokenizer.decode([33901, 86, 343, 86, 220, 959]) → \"Akwirw ier\"</b> ✓ 完全還原——亂打的字也能無損來回。"];
+function renderAK(){
+  const shown=Math.min(akN,6);
+  $("#akChips").innerHTML=AKT.map((t,i)=>i<shown
+    ?`<span class="wchip ${i===shown-1&&akN<=6?'hot':''}">${esc(t[0])}<small>${t[1]}</small></span>`
+    :`<span class="wchip masked">?<small>${t[1]}</small></span>`).join("");
+  $("#akCap").innerHTML=AK_CAPS[akN];
+  $("#akNext").disabled=akN>=7;
+  $("#akNext").textContent=akN===6?"驗證 decode →":"解碼下一個 →";
+}
+$("#akNext").addEventListener("click",()=>{if(akN<7){akN++;renderAK();}});
+$("#akAll").addEventListener("click",()=>{akN=7;renderAK();});
+$("#akReset").addEventListener("click",()=>{akN=0;renderAK();});
+renderAK();
+
+/* ===== 2.6 x/y 預測任務 stepper（enc_sample，書中真實數值）===== */
+const XY_IDS=[290,4920,2241,287,257],XY_W=["and","established","himself","in","a"];
+const XY_STEPS=5;let xyStep=0;
+function renderXY(){
+  $("#xyTape").innerHTML=XY_IDS.map((id,i)=>{
+    let cls="tcell";
+    if(xyStep>=1){if(i<xyStep)cls+=" inp";else if(i===xyStep)cls+=" tgt";else cls+=" dim";}
+    return `<div class="${cls}"><span>${id}</span><span class="w">${XY_W[i]}</span></div>`;
+  }).join("");
+  let h=`<span class="lbl"># enc_sample = enc_text[50:]；context_size = 4（書中真實輸出）</span>\nx = [290, 4920, 2241, 287]      <span class="lbl"># input：模型看到的</span>\ny =      [4920, 2241, 287, 257] <span class="lbl"># target：右移一格</span>`;
+  const idL=[],txL=[];
+  for(let i=1;i<=Math.min(xyStep,4);i++){
+    idL.push(`[${XY_IDS.slice(0,i).join(", ")}] ----> ${XY_IDS[i]}`);
+    txL.push(` ${XY_W.slice(0,i).join(" ")} ---->  ${XY_W[i]}`);
+  }
+  if(xyStep>=1)h+=`\n\n<span class="lbl"># 這一對 (x, y) 展開成 ${Math.min(xyStep,4)} 筆「預測下一個」任務：</span>\n`+idL.join("\n")+`\n<span class="lbl"># 同一件事翻成文字：</span>\n`+txL.map(l=>`<span style="color:var(--accent)">${l}</span>`).join("\n");
+  $("#xyTsr").innerHTML=h;
+  const caps=[
+   "<b>起點</b>：x 是 enc_sample 的前 4 個 token、y 是往右錯一格的同一段。滑動視窗的「一格」就長這樣。",
+   "<b>任務 1</b>：只看「and」（290）→ 該預測「established」（4920）。",
+   "<b>任務 2</b>：看「and established」→ 預測「himself」（2241）。前文變長，任務變新。",
+   "<b>任務 3</b>：看三個 token → 預測「in」（287）。",
+   "<b>任務 4</b>：看滿 4 個 token → 預測「a」（257）。一個視窗＝4 筆訓練樣本，右邊的字模型永遠看不到。"];
+  $("#xyCap").innerHTML=caps[xyStep];
+  $("#xyDots").innerHTML=Array.from({length:XY_STEPS},(_,i)=>`<span class="dot2 ${i===xyStep?'on':''}"></span>`).join("");
+  $("#xyPrev").disabled=xyStep===0;$("#xyNext").disabled=xyStep===XY_STEPS-1;
+}
+$("#xyNext").addEventListener("click",()=>{if(xyStep<XY_STEPS-1){xyStep++;renderXY();}});
+$("#xyPrev").addEventListener("click",()=>{if(xyStep>0){xyStep--;renderXY();}});
+renderXY();
+
+/* ===== 2.6 滑動視窗滑桿（《The Verdict》BPE 後真實前 33 個 ID）===== */
+const ENC33=[40,367,2885,1464,1807,3619,402,271,10899,2138,257,7026,15632,438,2016,257,922,5891,1576,438,568,340,373,645,1049,5975,284,502,284,3285,326,11,287];
+let winPos=0;
+function winCount(ml,st){return Math.max(0,Math.ceil((ENC33.length-ml)/st));}
+function renderWin(){
+  const ml=+$("#mlSlider").value,st=+$("#stSlider").value;
+  $("#mlVal").textContent=ml;$("#stVal").textContent=st;
+  const n=winCount(ml,st);
+  if(winPos>=n)winPos=Math.max(0,n-1);
+  const s=winPos*st;
+  $("#winTape").innerHTML=ENC33.map((id,i)=>{
+    let cls="tcell";
+    if(i>=s&&i<s+ml)cls+=" inp";
+    if(i>=s+1&&i<=s+ml)cls+=" tgt";
+    return `<div class="${cls}"><span>${id}</span></div>`;
+  }).join("");
+  const x=ENC33.slice(s,s+ml),y=ENC33.slice(s+1,s+ml+1);
+  let mark="";
+  if(ml===4&&st===1&&winPos===0)mark=`   <span class="lbl"># ＝書中 first_batch（batch_size=1, stride=1）</span>`;
+  if(ml===4&&st===1&&winPos===1)mark=`   <span class="lbl"># ＝書中 second_batch：整體右移 1 格</span>`;
+  if(ml===4&&st===4)mark=`   <span class="lbl"># ＝下方 batch_size=8 的第 ${winPos+1} 列</span>`;
+  $("#winTsr").innerHTML=`<span class="lbl"># 視窗 ${winPos+1} / ${n}（起點 token ${s}）</span>\nx = [${x.join(", ")}]${mark}\ny = [${y.join(", ")}]`;
+  const ov=ml-st;
+  $("#winCap").innerHTML=(st<ml?`stride(${st}) &lt; max_length(${ml})：相鄰視窗<b>重疊 ${ov} 個 token</b>——重疊過多＝訓練一直看重複內容，可能加重 overfitting。`
+    :st===ml?`stride ＝ max_length：<b>不重疊、也不跳過</b>，資料用好用滿——書中 batch 示範用的就是這個設定（4/4）。`
+    :`stride(${st}) &gt; max_length(${ml})：每滑一次<b>跳過 ${st-ml} 個 token</b>——這些 token 永遠不會被訓練到，浪費資料。`)
+    +`　共可切出 <b>${n}</b> 個視窗（33 個 token 的示範磁帶）。`;
+}
+["#mlSlider","#stSlider"].forEach(sel=>$(sel).addEventListener("input",()=>{winPos=0;renderWin();}));
+$("#winNext").addEventListener("click",()=>{const n=winCount(+$("#mlSlider").value,+$("#stSlider").value);winPos=(winPos+1)%n;renderWin();});
+$("#winPrev").addEventListener("click",()=>{const n=winCount(+$("#mlSlider").value,+$("#stSlider").value);winPos=(winPos-1+n)%n;renderWin();});
+renderWin();
+
+/* ===== 2.6 batch_size=8 真實 batch hover ===== */
+const BIN=[[40,367,2885,1464],[1807,3619,402,271],[10899,2138,257,7026],[15632,438,2016,257],[922,5891,1576,438],[568,340,373,645],[1049,5975,284,502],[284,3285,326,11]];
+const BTG=[[367,2885,1464,1807],[3619,402,271,10899],[2138,257,7026,15632],[438,2016,257,922],[5891,1576,438,568],[340,373,645,1049],[5975,284,502,284],[3285,326,11,287]];
+function fmtRow(row){return "["+row.map(v=>String(v).padStart(5)).join(", ")+"]";}
+function hiB(r){
+  $$("#bIn .mn, #bTg .mn").forEach(el=>el.classList.toggle("hot",r!==null&&+el.dataset.r===r));
+  if(r!==null){
+    $("#bCap").innerHTML=`第 ${r+1} 列：target ＝ 同一列 input 右移一格；最後一個 target <b>${BTG[r][3]}</b> ${r<7?`正好是第 ${r+2} 列 input 的第一個 ID——stride=4 讓 8 列無縫接起整段文章`:`接續整篇文章的下一個 token`}。`;
+  } else $("#bCap").innerHTML="👆 滑過任何一列：target 永遠是同一列 input 右移一格";
+}
+const mkB=(M,pre)=>`<span class="lbl"># ${pre}</span>\ntensor([`+M.map((r,i)=>`<span class="mn" data-r="${i}">${fmtRow(r)}</span>`).join(",\n        ")+`])`;
+$("#bIn").innerHTML=mkB(BIN,"create_dataloader_v1(raw_text, batch_size=8, max_length=4, stride=4)");
+$("#bTg").innerHTML=mkB(BTG,"targets ＝ inputs 右移一格");
+$$("#bIn .mn, #bTg .mn").forEach(el=>{
+  el.addEventListener("mouseenter",()=>hiB(+el.dataset.r));
+  el.addEventListener("mouseleave",()=>hiB(null));
+});
+hiB(null);
+
+/* ===== 2.7 embedding 查表（seed 123 真實權重）===== */
+const W6=[[0.3374,-0.1778,-0.1690],[0.9178,1.5810,1.3010],[1.2753,-0.2010,-0.1606],[-0.4015,0.9666,-1.1481],[-1.1589,0.3255,-0.6315],[-2.8400,-0.7849,-1.4096]];
+const fmtV=v=>(v<0?"":" ")+v.toFixed(4);
+const fmtVecRow=r=>"["+r.map(fmtV).join(", ")+"]";
+let embSel=3;
+function renderEmb(){
+  const selRows=embSel==="seq"?[2,3,5,1]:[embSel];
+  $("#embW").innerHTML=`<span class="lbl"># torch.manual_seed(123); embedding_layer = torch.nn.Embedding(6, 3)</span>\n<span class="lbl"># embedding_layer.weight（書中真實輸出）</span>\nParameter containing:\ntensor([`+W6.map((r,i)=>`<span class="mn ${selRows.includes(i)?'hot':''}">${fmtVecRow(r)}</span><span class="lbl">  # ← ID ${i} 的向量</span>`).join(",\n        ")+`], requires_grad=True)`;
+  if(embSel==="seq"){
+    $("#embOut").innerHTML=`<span class="lbl"># 一次查四個（書中真實輸出）</span>\nembedding_layer(torch.tensor([2, 3, 5, 1]))\n→ tensor([`+[2,3,5,1].map(i=>fmtVecRow(W6[i])).join(",\n          ")+`], grad_fn=&lt;EmbeddingBackward0&gt;)   <span class="lbl"># 形狀 [4, 3]</span>`;
+    $("#embCap").innerHTML=`<b>[2, 3, 5, 1]</b> → 依序取第 3、4、6、2 列，堆成 [4, 3]。輸出列的順序跟輸入 ID 的順序一致——查表就是這麼直白。`;
+  }else{
+    $("#embOut").innerHTML=`embedding_layer(torch.tensor([${embSel}]))\n→ tensor([${fmtVecRow(W6[embSel])}], grad_fn=&lt;EmbeddingBackward0&gt;)`+(embSel===3?`   <span class="lbl"># 書中示範的就是 ID 3</span>`:"");
+    $("#embCap").innerHTML=`ID <b>${embSel}</b> → 取出權重矩陣的<b>第 ${embSel+1} 列</b>（index 從 0 起算）。沒有計算、沒有魔法——就是查表。這些數字現在是隨機的，第 5 章訓練時會被梯度一點一點修改。`;
+  }
+  $$("#sec-27 .pill").forEach(b=>{
+    const k=b.dataset.id!==undefined?+b.dataset.id:"seq";
+    b.classList.toggle("on",k===embSel);
+  });
+}
+$$("#sec-27 .pill[data-id]").forEach(b=>b.addEventListener("click",()=>{embSel=+b.dataset.id;renderEmb();}));
+$("#embSeq").addEventListener("click",()=>{embSel="seq";renderEmb();});
+renderEmb();
+
+/* ===== 2.8 同 ID 同向量 demo（圖 2.17，[2,3,5,2]）===== */
+const POSQ=[[2,"fox"],[3,"jumps"],[5,"over"],[2,"fox"]];
+function hiPos(hiId){
+  $$("#posChips .wchip").forEach(el=>el.classList.toggle("hot",hiId!==null&&+el.dataset.id===hiId));
+  $$("#posTsr .mn").forEach(el=>el.classList.toggle("hot",hiId!==null&&+el.dataset.r===hiId));
+  if(hiId===2){$("#posNote").innerHTML=`<b>位置 0 和位置 3 的「fox」同時亮起</b>——兩者都查到第 3 列 [ 1.2753, -0.2010, -0.1606]，向量一模一樣。光看 token embedding，模型分不出哪個 fox 在前、哪個在後。`;}
+  else if(hiId!==null){const w=POSQ.find(t=>t[0]===hiId);$("#posNote").innerHTML=`「${w[1]}」（ID ${hiId}）→ 第 ${hiId+1} 列。它只出現一次，看不出問題——問題出在重複的 token 上，滑滑看 fox。`;}
+  else $("#posNote").textContent="滑過任何一個 token（注意首尾兩個 ID 2）→";
+}
+$("#posChips").innerHTML=POSQ.map((t,i)=>`<span class="wchip" data-id="${t[0]}">${t[1]}<small>位置 ${i} · ID ${t[0]}</small></span>`).join("");
+$("#posTsr").innerHTML=`<span class="lbl"># 同一張 6×3 embedding 表（2.7 的表）</span>\ntensor([`+W6.map((r,i)=>`<span class="mn" data-r="${i}">${fmtVecRow(r)}</span><span class="lbl">  # ID ${i}</span>`).join(",\n        ")+`])`;
+$$("#posChips .wchip").forEach(el=>{
+  el.addEventListener("mouseenter",()=>hiPos(+el.dataset.id));
+  el.addEventListener("mouseleave",()=>hiPos(null));
+});
+hiPos(null);
+
+/* ===== 2.8 最終組裝 stepper（形狀皆為書中真實輸出）===== */
+const FIN_STEPS=5;let finStep=0;
+function renderFin(){
+  let h=`<span class="lbl"># step 1 — dataloader 取一個 batch（2.6 的成果，batch_size=8, max_length=4）</span>\ninputs.shape = torch.Size(<span class="tn" style="font-weight:700">[8, 4]</span>)   <span class="lbl"># 8 個樣本 × 各 4 個 token ID</span>`;
+  if(finStep>=1)h+=`\n\n<span class="lbl"># step 2 — token embedding：詞彙表 50257、每列 256 維</span>\ntoken_embedding_layer = torch.nn.Embedding(50257, 256)\ntoken_embeddings = token_embedding_layer(inputs)\n→ torch.Size(<span class="tn" style="font-weight:700">[8, 4, 256]</span>)   <span class="lbl"># 每個 ID 換成一列 256 維向量</span>`;
+  if(finStep>=2)h+=`\n\n<span class="lbl"># step 3 — positional embedding：用「位置」當索引查另一張表</span>\npos_embedding_layer = torch.nn.Embedding(4, 256)\npos_embeddings = pos_embedding_layer(torch.arange(4))   <span class="lbl"># 索引＝[0, 1, 2, 3]</span>\n→ torch.Size(<span class="tn" style="font-weight:700">[4, 256]</span>)   <span class="lbl"># 位置 0–3 各一列</span>`;
+  if(finStep>=3)h+=`\n\n<span class="lbl"># step 4 — 相加（broadcast：同一份 [4,256] 加到 8 個樣本上）</span>\ninput_embeddings = token_embeddings + pos_embeddings\n→ torch.Size(<span class="tn" style="color:var(--accent);font-weight:700">[8, 4, 256]</span>)   <span class="lbl"># ✓ 本章最終產物</span>`;
+  if(finStep>=4)h+=`\n\n<span class="lbl"># 加法在做什麼？（示意值，依圖 2.18：token emb 全設 1 方便看）</span>\n位置 0： token [1.0, 1.0, 1.0] ＋ pos [1.1, 1.2, 1.3] ＝ <span class="tn" style="color:var(--accent)">[2.1, 2.2, 2.3]</span>\n位置 2： token [1.0, 1.0, 1.0] ＋ pos [3.1, 3.2, 3.3] ＝ <span class="tn" style="color:var(--accent)">[4.1, 4.2, 4.3]</span>\n<span class="lbl"># 同一個 token 落在不同位置 → 相加後的向量不再相同</span>`;
+  $("#finTsr").innerHTML=h;
+  const caps=[
+   "<b>step 1</b>：起點是 2.6 做好的 batch——8 列、每列 4 個 token ID（就是上面那個真實 tensor）。",
+   "<b>step 2</b>：對 [8, 4] 裡的每個 ID 查 token embedding 表 → 多出一個 256 維的軸，變 [8, 4, 256]。這張 50257×256 的表約 1,286 萬個參數。",
+   "<b>step 3</b>：位置表小得多——只需要 context_length（4）列。注意查表的索引不是 token ID，而是 torch.arange(4) ＝ 位置編號本身。",
+   "<b>step 4</b>：兩個形狀不同的 tensor 相加？PyTorch 的 broadcast 會把 [4, 256] 自動複製到 8 個樣本上。加完後，「是什麼字」和「在第幾格」的資訊融合在同一個向量裡。",
+   "<b>完成！</b>示意數字讓你看清加法的效果：位置不同 → 加的 pos 向量不同 → 同一個 token 的最終向量不再相同。這個 [8, 4, 256] 的 input_embeddings 就交棒給第 3 章的 attention。"];
+  $("#finCap").innerHTML=caps[finStep];
+  $("#finDots").innerHTML=Array.from({length:FIN_STEPS},(_,i)=>`<span class="dot2 ${i===finStep?'on':''}"></span>`).join("");
+  $("#finPrev").disabled=finStep===0;$("#finNext").disabled=finStep===FIN_STEPS-1;
+}
+$("#finNext").addEventListener("click",()=>{if(finStep<FIN_STEPS-1){finStep++;renderFin();}});
+$("#finPrev").addEventListener("click",()=>{if(finStep>0){finStep--;renderFin();}});
+renderFin();
+
+/* ===== quiz ===== */
+const quiz=[
+ {q:"為什麼要把文字轉成 embedding 向量？",o:["為了壓縮檔案大小","文字是類別型資料，神經網路的數學運算（矩陣乘法、梯度）只作用在連續數值上，必須先轉成向量","為了加密","因為 Python 不支援字串"],a:1,e:"深度網路處理不了 raw text。embedding 把離散物件對應到連續向量空間的點——文字、圖片、聲音各有自己的 embedding 模型，彼此不通用。"},
+ {q:"SimpleTokenizerV1 對 \"Hello, do you like tea?\" encode 會發生什麼？",o:["正常輸出 ID","自動跳過 Hello","KeyError：vocab 是從《The Verdict》建的，裡面沒有 \"Hello\"，查表直接失敗","輸出全零"],a:2,e:"V1 的 vocab 只有訓練文本裡的 1,130 個 token。訓練集之外的詞一查就爆——這就是 2.4 加 <|unk|>、2.5 換 BPE 的動機。"},
+ {q:"<|endoftext|> 的主要用途是？",o:["標示句子的主詞","訓練時串接多篇互不相關的文件，用它標示邊界，讓模型知道「這裡換一篇了」（GPT 也拿它兼任 padding）","觸發模型停止訓練","壓低 loss"],a:1,e:"把多份獨立文本接成一長串是預訓練的標準做法，<|endoftext|> 就是文件之間的分隔標記。GPT 的 tokenizer 只用這一個特殊 token，ID 是 50256（BPE 詞彙表中最大）。"},
+ {q:"BPE 遇到訓練時沒看過的詞（如 someunknownPlace）會怎樣？",o:["拋出 KeyError","換成 <|unk|>","整個詞跳過不編碼","拆成已知的子詞或單一字元（some + unknown + Place），任何字串都拼得出來，永遠不需要 <|unk|>"],a:3,e:"BPE 從單字元起步、反覆合併高頻字對建立詞彙表；罕見詞查不到整詞就用子詞零件拼。這正是書中實測：someunknownPlace → 617, 34680, 27271，decode 完美還原。"},
+ {q:"sliding window 產生的 target 序列是？",o:["input 反轉","與 input 完全相同","input 往右移一格（每個位置的「下一個 token」）","隨機抽的 token"],a:2,e:"訓練任務是預測下一個 token，所以 y 就是 x 右移一格：x=[290,4920,2241,287] → y=[4920,2241,287,257]。一個長度 4 的視窗同時提供 4 筆預測任務。"},
+ {q:"stride 設成跟 max_length 一樣大（書中 batch 用 4/4）的效果是？",o:["視窗完全不重疊、也不跳過任何 token——資料用好用滿，並避免重疊帶來的 overfitting 風險","訓練會變慢","target 會錯位","詞彙表變大"],a:0,e:"stride<max_length 時相鄰樣本高度重疊（模型反覆看幾乎相同的內容）；stride>max_length 則會跳過 token。stride=max_length 是兩者間的甜蜜點。"},
+ {q:"為什麼 token embedding 之外還要加 positional embedding？",o:["為了讓向量變長","同一個 ID 在任何位置都查到同一列向量，而 self-attention 本身也沒有順序概念——必須把「在第幾格」的資訊加進向量","為了節省記憶體","PyTorch 的強制規定"],a:1,e:"圖 2.17 的重點：序列 [2,3,5,2] 首尾的 2 查到完全相同的向量。解法是再查一張以「位置」為索引的表（[4,256]），broadcast 加到 [8,4,256] 上——GPT 用的是可訓練的絕對位置編碼。"}];
+const qc=$("#quizBox");let ans=0,cor=0;
+quiz.forEach((it,qi)=>{const w=document.createElement("div");w.className="q";w.innerHTML=`<div class="qn">Q${qi+1} / ${quiz.length}</div><div class="qt">${it.q}</div>`;
+ it.o.forEach((o,oi)=>{const b=document.createElement("button");b.className="opt";b.innerHTML=o+'<span class="mk"></span>';
+  b.addEventListener("click",()=>{if(w.dataset.done)return;w.dataset.done=1;ans++;const ok=oi===it.a;if(ok)cor++;b.classList.add(ok?"correct":"wrong");b.querySelector(".mk").textContent=ok?"✓":"✗";if(!ok){const cb=w.querySelectorAll(".opt")[it.a];cb.classList.add("correct");cb.querySelector(".mk").textContent="✓";}w.querySelector(".exp").classList.add("show");if(ans===quiz.length)$("#score").textContent=`完成 ✓ 答對 ${cor} / ${quiz.length} 題`;});
+  w.appendChild(b);});
+ const ex=document.createElement("div");ex.className="exp";ex.textContent="▸ "+it.e;w.appendChild(ex);qc.appendChild(w);});
+})();
+</script>
+</body>
+</html>
