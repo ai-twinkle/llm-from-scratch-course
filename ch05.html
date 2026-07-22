@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ch5 在無標註資料上預訓練｜互動教材</title>
+<style>
+:root{
+  --accent:#0e9488;--accent-soft:#2fb4a6;--accent-ghost:rgba(14,148,136,.12);
+  --bg:#e5eae8;--grid:rgba(18,30,28,.05);--surface:#f5f8f7;--surface-2:#e7eeec;
+  --ink:#14201d;--muted:#556460;--faint:#849490;
+  --line:rgba(18,30,28,.14);--line-strong:rgba(18,30,28,.28);
+  --ok:#3f8a52;--bad:#c0492f;--cool:#2f6fb0;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"PingFang TC","Noto Sans TC","Segoe UI",sans-serif;
+  --maxw:1220px;--read:68ch;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#08100e;--grid:rgba(47,180,166,.06);--surface:#0f1917;--surface-2:#16211f;
+  --ink:#e2ece9;--muted:#93a29d;--faint:#647670;--line:rgba(220,240,235,.13);--line-strong:rgba(220,240,235,.26);
+  --accent:#26b6a7;--accent-soft:#4fd0c1;--accent-ghost:rgba(38,182,167,.15);--ok:#5faf70;--bad:#e2694f;--cool:#6f9ede;}}
+:root[data-theme="light"]{--bg:#e5eae8;--grid:rgba(18,30,28,.05);--surface:#f5f8f7;--surface-2:#e7eeec;--ink:#14201d;--muted:#556460;--faint:#849490;--line:rgba(18,30,28,.14);--line-strong:rgba(18,30,28,.28);--accent:#0e9488;--accent-soft:#2fb4a6;--accent-ghost:rgba(14,148,136,.12);--ok:#3f8a52;--bad:#c0492f;--cool:#2f6fb0;}
+:root[data-theme="dark"]{--bg:#08100e;--grid:rgba(47,180,166,.06);--surface:#0f1917;--surface-2:#16211f;--ink:#e2ece9;--muted:#93a29d;--faint:#647670;--line:rgba(220,240,235,.13);--line-strong:rgba(220,240,235,.26);--accent:#26b6a7;--accent-soft:#4fd0c1;--accent-ghost:rgba(38,182,167,.15);--ok:#5faf70;--bad:#e2694f;--cool:#6f9ede;}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.68;-webkit-font-smoothing:antialiased;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:30px 30px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(16px,4vw,40px)}
+a{color:var(--accent)}
+#prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:70;transition:width .1s}
+header.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:color-mix(in srgb,var(--bg) 88%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:52px}
+.brand{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px}.brand b{color:var(--ink)}
+.chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border:1px solid var(--accent);color:var(--accent);border-radius:2px}
+.spacer{flex:1}.tbtn{font-family:var(--mono);font-size:12px;color:var(--muted);background:none;border:1px solid var(--line);border-radius:3px;padding:5px 10px;cursor:pointer}.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+/* 全域訓練閉環圖 */
+.map{position:sticky;top:52px;z-index:49;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:8px 0 6px}
+.map .wrap{display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:none}
+.map .wrap::-webkit-scrollbar{display:none}
+.mapstage{flex:none;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);cursor:pointer;transition:.25s;white-space:nowrap}
+.mapstage .em{font-size:12px}
+.mapstage:hover{border-color:var(--accent-soft)}
+.mapstage.lit{background:var(--accent);color:#032420;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ghost)}
+.mapsep{flex:none;color:var(--faint);padding:0 2px;font-size:11px}
+.mapsub{font-family:var(--mono);font-size:11px;color:var(--accent);padding:3px 0 0;min-height:16px}
+.mapsub b{color:var(--ink)}
+@media(max-width:700px){.mapstage{font-size:10px;padding:4px 7px}}
+/* layout */
+.shell{display:grid;grid-template-columns:186px minmax(0,1fr);gap:40px;padding-top:28px}
+@media(max-width:960px){.shell{grid-template-columns:1fr;gap:0}}
+nav.toc{position:sticky;top:118px;align-self:start;font-family:var(--mono);font-size:12px;max-height:calc(100vh - 140px);overflow:auto}
+@media(max-width:960px){nav.toc{display:none}}
+nav.toc .lbl{color:var(--faint);letter-spacing:.14em;font-size:10px;text-transform:uppercase;margin-bottom:10px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--ink);border-color:var(--line-strong)}nav.toc a.active{color:var(--accent);border-color:var(--accent)}
+main{min-width:0}
+.hero{padding:6px 0 26px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(26px,4.6vw,42px);line-height:1.06;margin:0;letter-spacing:-.01em}
+h1 .sub{display:block;font-size:clamp(14px,2.2vw,18px);color:var(--muted);font-weight:500;margin-top:10px}
+.lede{font-size:16px;color:var(--muted);max-width:var(--read);margin:16px 0 0}
+section{padding:38px 0;border-bottom:1px solid var(--line);scroll-margin-top:132px}
+.sh{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;flex-wrap:wrap}
+.sh .num{font-family:var(--mono);color:var(--accent);font-size:13px;font-weight:600}
+h2{font-family:var(--mono);font-weight:600;font-size:clamp(18px,2.8vw,24px);margin:0;letter-spacing:-.01em}
+h3{font-family:var(--mono);font-size:15px;margin:28px 0 8px;font-weight:600;color:var(--ink)}
+p{max-width:var(--read);margin:12px 0;color:var(--muted)}p strong,li strong{color:var(--ink)}
+.en{font-family:var(--mono);font-size:.92em;color:var(--accent);font-weight:600}
+ul.clean{max-width:var(--read);padding-left:0;list-style:none;margin:14px 0}ul.clean li{position:relative;padding-left:20px;margin:8px 0;color:var(--muted)}
+ul.clean li::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+.plain{max-width:var(--read);background:var(--accent-ghost);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 16px;margin:16px 0;font-size:14.5px;color:var(--ink)}
+.plain .ph{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent);font-weight:700;margin-bottom:5px}
+.plain p{margin:6px 0 0;color:var(--ink);max-width:none}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.small{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+canvas{display:block;width:100%;height:auto}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:14px 0}
+pre .c{color:var(--faint)}pre .k{color:var(--accent)}
+code.inl{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:var(--ink)}
+.btn{font-family:var(--mono);font-size:12.5px;padding:8px 15px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#032420;cursor:pointer;font-weight:600}
+.btn.ghost{background:none;color:var(--accent)}.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font-family:var(--mono);font-size:12px;padding:7px 12px;background:var(--surface-2);border:none;border-right:1px solid var(--line);cursor:pointer;color:var(--muted)}
+.seg button:last-child{border-right:none}.seg button.on{background:var(--accent);color:#032420}
+.pill{font-family:var(--mono);font-size:12px;padding:6px 11px;border:1px solid var(--line);background:var(--surface-2);border-radius:20px;cursor:pointer;color:var(--muted)}
+.pill:hover{border-color:var(--accent);color:var(--accent)}.pill.on{background:var(--accent);color:#032420;border-color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+input[type=range]{-webkit-appearance:none;height:4px;border-radius:3px;background:var(--surface-2);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:pointer}
+/* tensor（array）呈現 */
+.tsr{font-family:var(--mono);font-size:12.5px;line-height:1.9;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.tsr .pn{color:var(--faint)}
+.tsr .lbl{color:var(--faint);font-size:11px}
+.tn{display:inline-block;padding:0 5px;border-radius:5px;transition:.12s;cursor:default}
+.tn:hover,.tn.hot{background:var(--accent);color:#032420!important}
+.tn.dimmed{opacity:.35}
+.tn.neg{color:var(--cool)}
+.tsrnote{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-height:18px;margin-top:8px}
+.tsrnote b{color:var(--ink)}
+/* 積木進度（本章 7 個步驟） */
+.bricks{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin:14px 0}
+.brick{font-family:var(--mono);font-size:11.5px;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);color:var(--muted);cursor:pointer;transition:.25s;display:flex;gap:8px;align-items:flex-start}
+.brick .ck{width:16px;height:16px;flex:none;border:1.5px solid var(--line-strong);border-radius:4px;display:grid;place-items:center;font-size:10px;color:#fff;margin-top:1px}
+.brick.done{border-color:var(--ok);color:var(--ink)}.brick.done .ck{background:var(--ok);border-color:var(--ok)}
+.brick.now{border-color:var(--accent);background:var(--accent-ghost);color:var(--ink);box-shadow:0 0 0 3px var(--accent-ghost)}
+.brick.now .ck{border-color:var(--accent);color:var(--accent)}
+/* 句子 chips */
+.sent{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+.wchip{font-family:var(--mono);font-size:13.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);cursor:default;transition:.12s}
+.wchip.hot{background:var(--accent);color:#032420;border-color:var(--accent)}
+.wchip small{display:block;font-size:9.5px;color:var(--faint);text-align:center}
+.wchip.hot small{color:#032420}
+/* stepper 共用 */
+.stepbar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.dots{display:flex;gap:6px;align-items:center;margin-left:auto}
+.dot2{width:9px;height:9px;border-radius:50%;background:var(--line-strong)}.dot2.on{background:var(--accent)}
+.stepcap{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--accent-ghost);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;padding:11px 14px;margin-top:12px;min-height:42px}
+.stepcap b{color:var(--accent)}
+/* code-line stepper */
+.codelines{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 0;overflow-x:auto}
+.cl{padding:3px 16px;white-space:pre;color:var(--muted);border-left:3px solid transparent;transition:.2s}
+.cl.lit{background:var(--accent-ghost);border-left-color:var(--accent);color:var(--ink)}
+.cl .cm{color:var(--faint)}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--accent-ghost);border-radius:0 8px 8px 0;padding:12px 15px;margin:16px 0;max-width:var(--read);font-size:14px;color:var(--muted)}.note b{color:var(--accent)}
+/* 機率矩陣表 */
+.cmtable{border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.cmtable th,.cmtable td{border:1px solid var(--line);padding:7px 10px;text-align:center}
+.cmtable th{color:var(--muted);font-weight:600;background:var(--surface-2);font-size:11px}
+.cmtable td.tgt{outline:2px solid var(--accent);outline-offset:-2px;font-weight:700;color:var(--accent)}
+.cmtable td.amx{background:var(--accent-ghost)}
+.cmtable td.dim{color:var(--faint)}
+/* 訓練/推論 模式徽章 */
+.mode{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:3px 10px;border-radius:20px;vertical-align:3px;margin-left:10px;white-space:nowrap}
+.mode.train{background:color-mix(in srgb,var(--cool) 16%,transparent);color:var(--cool);border:1px solid var(--cool)}
+.mode.infer{background:var(--accent-ghost);color:var(--accent);border:1px solid var(--accent)}
+/* io 卡 */
+.iocard{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin:12px 0 6px;overflow-x:auto;padding-bottom:2px}
+.iocard .io{display:flex;flex-direction:column;justify-content:center;text-align:center;padding:8px 12px;border-radius:8px;line-height:1.5;flex:none}
+.iocard .in,.iocard .out{border:1.5px dashed var(--line-strong);color:var(--muted);background:var(--surface)}
+.iocard .out{border-color:var(--accent-soft)}
+.iocard .box{border:1.5px solid var(--accent);background:var(--accent-ghost);color:var(--ink);font-weight:600}
+.iocard .box small{display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px}
+.iocard .ioarrow{align-self:center;color:var(--faint);flex:none}
+/* 往返動畫（文字→ID→模型→文字） */
+.w2e{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;min-height:90px}
+.w2e .stg{opacity:.22;transition:opacity .45s,transform .45s;transform:translateY(5px);flex:none}
+.w2e .stg.lit{opacity:1;transform:none}
+.w2e .arrow{color:var(--faint);font-size:10.5px;text-align:center;line-height:1.5}
+.w2e .wordbig{font-size:15px;font-weight:700;color:var(--accent);border:1.5px solid var(--accent);border-radius:10px;padding:10px 14px;background:var(--accent-ghost)}
+.w2e .idbig{font-size:13px;font-weight:600;border:1.5px solid var(--line-strong);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
+.decoded{font-family:var(--mono);font-size:13.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:10px;min-height:44px}
+.decoded .nw{color:var(--accent);font-weight:700}
+.decoded .bad2{color:var(--bad);font-weight:700}
+/* 機率長條 */
+.pbrow{display:grid;grid-template-columns:76px 1fr 150px;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;margin:5px 0;color:var(--muted)}
+.pbrow .barwrap{background:var(--surface-2);border-radius:3px;height:16px;overflow:hidden}
+.pbrow .bar{height:100%;background:var(--accent);opacity:.8;transition:width .25s}
+.pbrow.amx{color:var(--ink);font-weight:600}.pbrow.amx .bar{opacity:1}
+.pbrow.zero .bar{background:var(--line-strong)}
+.pbrow .cnum{font-variant-numeric:tabular-nums}
+/* token 視窗塊（train/val split） */
+.winrow{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0;align-items:center}
+.win{width:24px;height:16px;border-radius:4px;background:var(--accent);opacity:.85;flex:none}
+.win.val{background:var(--cool)}
+.win.drop{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,var(--line) 4px,var(--line) 6px);border:1px dashed var(--line-strong);opacity:.9}
+.winleg{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px}
+.winleg i{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:5px}
+/* perplexity 標尺 */
+.pxtrack{position:relative;height:52px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;margin:10px 0}
+.pxmark{position:absolute;top:0;bottom:0;width:2px;background:var(--line-strong)}
+.pxmark span{position:absolute;top:-2px;left:5px;font-family:var(--mono);font-size:9.5px;color:var(--faint);white-space:nowrap}
+.pxdot{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);transition:left .15s}
+/* quiz */
+.quiz .q{margin:18px 0}.quiz .qn{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:7px}.quiz .qt{font-weight:600;color:var(--ink);max-width:var(--read);margin-bottom:9px}
+.opt{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 14px;margin:6px 0;cursor:pointer;font-family:var(--sans);font-size:14px;color:var(--ink);max-width:var(--read)}
+.opt:hover{border-color:var(--accent)}.opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.opt .mk{float:right;font-family:var(--mono);font-weight:700}.opt.correct .mk{color:var(--ok)}.opt.wrong .mk{color:var(--bad)}
+.exp{max-width:var(--read);font-size:13px;color:var(--muted);padding:9px 14px;border-left:2px solid var(--accent);margin:5px 0 0;display:none}.exp.show{display:block}
+.foot{font-family:var(--mono);font-size:11px;color:var(--faint);padding:28px 0 70px;text-align:center;line-height:1.9}
+kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<header class="top"><div class="wrap">
+  <div class="brand"><span class="chip">CH·5</span><b><a href="index.html" style="color:inherit;text-decoration:none">從零打造 LLM</a></b><span style="color:var(--faint)">/ 在無標註資料上預訓練</span></div>
+  <div class="spacer"></div><button class="tbtn" id="themeBtn">◐ 主題</button>
+</div></header>
+
+<div class="map">
+  <div class="wrap" id="mapRow"></div>
+  <div class="wrap"><div class="mapsub" id="mapSub"></div></div>
+</div>
+
+<div class="wrap"><div class="shell">
+  <nav class="toc" aria-label="章節導覽">
+    <div class="lbl">Chapter 5</div>
+    <a href="#sec-intro">本章定位 · 7 個步驟</a>
+    <a href="#sec-511">5.1.1 先讓 GPT 開口</a>
+    <a href="#sec-512">5.1.2 生成文字的 loss</a>
+    <a href="#sec-513">5.1.3 訓練／驗證 loss</a>
+    <a href="#sec-52">5.2 訓練一個 LLM</a>
+    <a href="#sec-53">5.3 解碼策略</a>
+    <a href="#sec-54">5.4 權重存讀</a>
+    <a href="#sec-55">5.5 載入 OpenAI 權重</a>
+    <a href="#sec-sum">本章小結</a>
+    <a href="#sec-quiz">✓ 知識檢核</a>
+  </nav>
+
+  <main>
+    <div class="hero" id="top">
+      <p class="eyebrow">Build a Large Language Model (From Scratch) · Chapter 5</p>
+      <h1>在無標註資料上預訓練<span class="sub">Pretraining on unlabeled data</span></h1>
+      <p class="lede">第 4 章組好的 GPT 只會輸出亂碼——因為權重還是隨機的。這一章補上靈魂：先定義「生成得好不好」的數值指標（<span class="en">loss</span>），再寫訓練迴圈實際<strong>預訓練</strong>它，接著用 <span class="en">temperature</span> 與 <span class="en">top-k</span> 控制生成的隨機性，最後把 OpenAI 訓練好的 GPT-2 權重直接載進我們的模型。頁面中的關鍵數值都與書中執行輸出一致（示意值會另行標明）。</p>
+    </div>
+
+    <!-- ===== 本章定位 ===== -->
+    <section id="sec-intro" data-map="all">
+      <div class="sh"><span class="num">00</span><h2>本章定位：讓模型「學會講話」</h2></div>
+      <p>整本書的三階段地圖裡，本章是<strong>第二階段：預訓練</strong>——把第一階段搭好的架構，變成一個能生成連貫文字的 <span class="en">foundation model</span>：</p>
+      <div class="iocard">
+        <span class="io in">STAGE 1（ch2–4）<br>資料處理 · attention · 架構 ✓</span><span class="ioarrow">→</span>
+        <span class="io box">STAGE 2（本章）<br>預訓練 pretraining<small>訓練迴圈 · 模型評估 · 載入預訓練權重</small></span><span class="ioarrow">→</span>
+        <span class="io out">STAGE 3（ch6–7）<br>微調：分類器 / 助理</span>
+      </div>
+      <p>本章的 7 個步驟——<strong>會隨你往下讀自動打勾</strong>（也可以點擊跳到該節）：</p>
+      <div class="bricks" id="bricks"></div>
+      <div class="plain"><div class="ph">🔰 先建立心態</div><p>預訓練的邏輯一句話就講完：<strong>拿一段文字、遮住下一個字，讓模型猜；猜錯就把權重往「更會猜對」的方向調一點；重複幾百萬次</strong>。本章所有內容——loss、訓練迴圈、評估——都是在把這句話變成可以執行的程式。而「無標註資料」的妙處是：<b>下一個字本身就是標準答案</b>，不需要人工標記，網路上的任何文字都能拿來訓練。</p></div>
+      <div class="plain"><div class="ph">🔰 複習：訓練 vs 推論（本頁會隨時標註）</div><p><span class="mode train">🏋️ 訓練 training</span>＝forward 算預測 → 算 loss → backward 算梯度 → <b>更新權重</b>——本章的主戲；<span class="mode infer">💬 推論 inference</span>＝<b>權重固定</b>、只做 forward、一次吐一個字——5.1.1 的生成回顧與 5.3 的解碼策略屬於這邊。各節標題旁會掛上對應的標籤。</p></div>
+      <h3>暖身：loss 是整章的方向盤</h3>
+      <p>訓練要「往好的方向調」，前提是先能<strong>量化</strong>「現在有多差」。這個數字就是 <span class="en">loss</span>（損失）：<b>愈小＝模型把正確答案的機率估得愈高</b>。先預告本章會看到的三個關鍵數字：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># 這三個數字本章都會親手算出來（真實輸出）</span>
+訓練前（隨機權重）   loss ≈ <span class="tn" style="color:var(--bad);font-weight:700">10.98</span>   <span class="lbl"># 等於在 50257 個字裡亂猜</span>
+訓練 10 epoch 後     train loss <span class="tn" style="color:var(--accent);font-weight:700">0.391</span>  /  val loss <span class="tn" style="color:var(--cool);font-weight:700">6.452</span>   <span class="lbl"># 這個巨大落差是本章的重要教材（overfitting）</span></div></div>
+    </section>
+
+    <!-- ===== 5.1.1 ===== -->
+    <section id="sec-511" data-map="s-fwd,s-gen">
+      <div class="sh"><span class="num">5.1.1</span><h2>Using GPT to generate text（先讓 GPT 開口）<span class="mode infer">💬 推論</span></h2></div>
+      <div class="iocard"><span class="io in">input：文字<br>"Every effort moves you"</span><span class="ioarrow">→</span><span class="io box">tokenizer → GPTModel（未訓練）→ 解碼<small>text_to_token_ids · generate_text_simple · token_ids_to_text</small></span><span class="ioarrow">→</span><span class="io out">output：文字<br>（亂碼，預期結果）</span></div>
+      <p>先把第 4 章的模型架起來。設定和上一章幾乎相同，只改一個地方——<strong>點任一行看說明：</strong></p>
+      <div class="stage">
+        <div class="codelines" id="cfgLines"></div>
+        <div class="stepcap" id="cfgCap">👆 點一行 config，看它的意思（注意 context_length 那行）</div>
+      </div>
+      <p>接著定義兩個貫穿全章的小工具：<code class="inl">text_to_token_ids()</code>（文字 → ID tensor，並用 <code class="inl">unsqueeze(0)</code> 補上 batch 維）與 <code class="inl">token_ids_to_text()</code>（反向）。<strong>按播放，看一段文字的完整往返：</strong></p>
+      <div class="stage">
+        <div class="controls"><span class="small">start_context = "Every effort moves you"　·　max_new_tokens = 10</span><span style="flex:1"></span><button class="btn" id="rtPlay">▶ 播放</button></div>
+        <div class="w2e" id="rt">
+          <div class="stg" data-s="0"><div class="wordbig">"Every effort moves you"</div></div>
+          <div class="stg arrow" data-s="1">text_to_token_ids<br>tiktoken(gpt2)<br>→</div>
+          <div class="stg" data-s="1"><div class="idbig">tensor([[6109, 3626,<br>&nbsp;&nbsp;6100, 345]])<br><span class="small">形狀 [1, 4]</span></div></div>
+          <div class="stg arrow" data-s="2">generate_text_simple<br>接龍 10 個 token<br>→</div>
+          <div class="stg" data-s="2"><div class="idbig" style="border-color:var(--accent)">[1, 14]<br><span class="small">每輪 +1 個 ID</span></div></div>
+          <div class="stg arrow" data-s="3">token_ids_to_text<br>→</div>
+        </div>
+        <div class="decoded" id="rtOut" style="opacity:.25;transition:opacity .4s"><span class="small lbl">Output text: </span>"Every effort moves you<span class="bad2"> rentingetic wasn? refres RexMeCHicular stren</span>"</div>
+        <div class="stepcap" id="rtCap">👆 按「播放」跑一遍：文字 → token ID → 模型生成 → 解碼回文字</div>
+      </div>
+      <div class="note"><b>亂碼在意料之中</b>——權重是隨機的。但這裡浮現本章第一個核心問題：「連貫」「像人話」是主觀感受，訓練需要的是<strong>一個可以微分、可以優化的數字</strong>。下一節就來定義它。</div>
+    </section>
+
+    <!-- ===== 5.1.2 ===== -->
+    <section id="sec-512" data-map="s-fwd,s-loss">
+      <div class="sh"><span class="num">5.1.2</span><h2>Calculating the text generation loss（生成文字的 loss）</h2></div>
+      <div class="iocard"><span class="io in">input：logits [2, 3, 50257]<br>＋ targets [2, 3]</span><span class="ioarrow">→</span><span class="io box">cross entropy<small>softmax → 取 target 位置機率 → log → 平均 → 取負</small></span><span class="ioarrow">→</span><span class="io out">output：loss<br>一個數字（10.7940）</span></div>
+      <p>用兩句迷你例子把 loss 一步步算出來。<code class="inl">inputs</code> 是輸入、<code class="inl">targets</code> 是「右移一格」的正確答案（第 2 章 data loader 的老朋友）。<strong>滑過任一位置</strong>，看那個位置的模型視野與它該預測的答案：</p>
+      <div class="stage">
+        <div class="sent" id="inChips"></div>
+        <div class="tsr" id="ioTsr"></div>
+        <div class="tsrnote" id="ioNote">滑過上面任何一個字試試 →</div>
+      </div>
+
+      <h3>訓練目標＝把「正確答案格子」的機率推高</h3>
+      <p>把 logits 過 softmax，每個位置得到一條「下一個字是誰」的機率分佈。書中用 <strong>7 個字的迷你詞彙表</strong>把這件事畫出來（數值為書中示意）：黃框＝target（正確答案）的格子，底色＝該列 argmax（模型目前會選的字）。<strong>切換前後對照：</strong></p>
+      <div class="stage">
+        <div class="controls"><span class="seg" id="pmSeg"><button data-m="0" class="on">未訓練（機率 ≈ 均勻）</button><button data-m="1">理想訓練後</button></span></div>
+        <div style="overflow-x:auto"><table class="cmtable" id="pmTable"></table></div>
+        <div class="stepcap" id="pmCap"></div>
+      </div>
+      <div class="note"><b>從 1/7 到 1/50257：</b>示意圖只有 7 個字，所以未訓練的機率在 1/7 ≈ 0.14 附近；真實模型的詞彙表有 50257 個字，未訓練的機率會在 <b>1/50257 ≈ 0.00002</b> 附近——下面馬上看到真實數值。</div>
+
+      <h3>六步算出 cross entropy loss（書中真實數值）</h3>
+      <p>對真正的 <code class="inl">GPTModel</code>（詞彙表 50257）做同樣的事。反向傳播需要一個 loss 函數來衡量「差多遠」——<strong>按「下一步」逐步推導：</strong></p>
+      <div class="stage">
+        <div class="tsr" id="lsTsr"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="lsPrev">← 上一步</button>
+          <button class="btn" id="lsNext">下一步 →</button>
+          <span class="dots" id="lsDots"></span>
+        </div>
+        <div class="stepcap" id="lsCap"></div>
+      </div>
+      <pre><span class="c"># PyTorch 一行就把六步全包了（先把 batch 維攤平）：</span>
+logits_flat  = logits.flatten(0, 1)      <span class="c"># [2, 3, 50257] → [6, 50257]</span>
+targets_flat = targets.flatten()         <span class="c"># [2, 3] → [6]</span>
+loss = torch.nn.functional.<span class="k">cross_entropy</span>(logits_flat, targets_flat)
+<span class="c"># → tensor(10.7940)　✓ 和手算一致</span></pre>
+      <div class="note"><b>為什麼要取 log？</b>直接最大化機率也行，但機率是很多小數字的<strong>連乘</strong>，數值上既容易 underflow、優化又難；取 log 把連乘變<strong>連加</strong>、把 [0,1] 展開到 (−∞, 0]，數學上更好操作。深度學習慣例是「把某個量最小化」，所以再乘 −1——這就是「<b>負平均對數機率</b>」＝ cross entropy。</div>
+
+      <h3>Perplexity：loss 的白話翻譯</h3>
+      <p><span class="en">perplexity = exp(loss)</span>，可以直觀讀成「<strong>模型此刻等效在幾個字之間亂猜</strong>」。拖動 loss，看 perplexity 的爆炸性變化：</p>
+      <div class="stage">
+        <div class="controls" style="gap:14px">
+          <span class="small">loss = <b id="pxVal" style="color:var(--accent)">10.79</b></span>
+          <input type="range" id="pxSlider" min="0" max="11" step="0.01" value="10.79" style="flex:1;min-width:180px">
+          <span class="small">perplexity = e^loss = <b id="pxPpl" style="color:var(--accent)"></b></span>
+        </div>
+        <div class="pxtrack" id="pxTrack"></div>
+        <div class="stepcap" id="pxCap"></div>
+      </div>
+    </section>
+
+    <!-- ===== 5.1.3 ===== -->
+    <section id="sec-513" data-map="s-data,s-loss">
+      <div class="sh"><span class="num">5.1.3</span><h2>Training and validation set losses（訓練／驗證 loss）</h2></div>
+      <div class="iocard"><span class="io in">input：《The Verdict》全文<br>20,479 字元 / 5,145 tokens</span><span class="ioarrow">→</span><span class="io box">切 train / val → data loader<small>max_length=256 · stride=256 · batch_size=2</small></span><span class="ioarrow">→</span><span class="io out">output：train_loss 與 val_loss<br>兩個監控指標</span></div>
+      <p>接著把 loss 從「兩句話」推廣到「整份資料集」。資料仍是第 2 章用過的公有領域短篇小說《The Verdict》：<b>20,479</b> 個字元、tokenize 後 <b>5,145</b> 個 token——小到筆電幾分鐘就能跑完一輪訓練。</p>
+      <div class="plain"><div class="ph">🔰 為什麼要切出驗證集（validation set）？</div><p>只看訓練資料的 loss，就像只用「寫過的考古題」評估學生——背下來就能拿滿分。所以把資料切成兩份：<b>訓練集</b>（讓模型調權重用）和<b>驗證集</b>（模型從沒讀過、只用來測試）。兩個 loss 一起看，才能分辨模型是「真的學會語言」還是「把課文背起來」——這個對照正是本章結尾最大的伏筆。</p></div>
+      <p><strong>拖動 train_ratio</strong>，看 5,145 個 token 怎麼被切成 256-token 的視窗、再兩兩組成 batch（書中用 0.9）：</p>
+      <div class="stage">
+        <div class="controls" style="gap:14px">
+          <span class="small">train_ratio = <b id="spVal" style="color:var(--accent)">0.90</b></span>
+          <input type="range" id="spSlider" min="0.5" max="0.95" step="0.05" value="0.9" style="flex:1;min-width:180px">
+        </div>
+        <div class="winrow" id="spWins"></div>
+        <div class="winleg"><span><i style="background:var(--accent)"></i>train 視窗（256 tokens）</span><span><i style="background:var(--cool)"></i>val 視窗</span><span><i style="background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,var(--line) 4px,var(--line) 6px)"></i>不足一個 batch 被丟棄（drop_last=True）</span></div>
+        <div class="stepcap" id="spCap"></div>
+      </div>
+      <pre>def calc_loss_batch(input_batch, target_batch, model, device):
+    input_batch  = input_batch.to(device)     <span class="c"># 有 GPU 就搬去 GPU</span>
+    target_batch = target_batch.to(device)
+    logits = model(input_batch)
+    return torch.nn.functional.cross_entropy(  <span class="c"># 上一節的六步，一行搞定</span>
+        logits.flatten(0, 1), target_batch.flatten())
+
+def calc_loss_loader(data_loader, model, device, num_batches=None):
+    ...                                        <span class="c"># 逐 batch 呼叫上面的函數、取平均</span></pre>
+      <p>對還沒訓練的模型跑一次（<code class="inl">with torch.no_grad()</code>——只是量測、不用算梯度）：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># 書中真實輸出（隨機權重、seed 123）</span>
+Training loss:   <span class="tn" style="color:var(--bad);font-weight:700">10.98758347829183</span>
+Validation loss: <span class="tn" style="color:var(--bad);font-weight:700">10.98110580444336</span>
+
+<span class="lbl"># 補充：純亂猜的理論值 = −ln(1/50257) = ln(50257) ≈ 10.82 —— 兩者同量級，
+# 證明隨機權重的模型確實「毫無頭緒」。訓練的任務：把它壓下去。</span></div></div>
+      <div class="plain"><div class="ph">💰 順帶一提：真實 LLM 的預訓練有多貴？</div><p>我們用 5,145 個 token 練習；Llama 2 7B 用了 <b>2 兆</b>個 token、184,320 個 A100 GPU 小時——照當時雲端價格估算約 <b>69 萬美元</b>。這就是為什麼 5.5 節「直接載入別人訓練好的權重」在實務上如此重要。</p></div>
+    </section>
+
+    <!-- ===== 5.2 ===== -->
+    <section id="sec-52" data-map="all">
+      <div class="sh"><span class="num">5.2</span><h2>Training an LLM（訓練一個 LLM）<span class="mode train">🏋️ 訓練</span></h2></div>
+      <div class="iocard"><span class="io in">input：train_loader + 隨機權重</span><span class="ioarrow">→</span><span class="io box">train_model_simple<small>10 epochs × 9 batches，AdamW（lr=4e-4, weight_decay=0.1）</small></span><span class="ioarrow">→</span><span class="io out">output：會寫《The Verdict》腔調的模型<br>（外加兩條 loss 曲線）</span></div>
+      <p>零件到齊，可以組訓練迴圈了。它就是把上方管線圖跑成迴圈：<strong>取 batch → forward 算 loss → backward 算梯度 → 更新權重</strong>，每 5 步量一次 train/val loss，每個 epoch 結束生成一段樣本讓你肉眼檢查。<strong>逐行走一遍：</strong></p>
+      <div class="stage">
+        <div class="codelines" id="loopLines"></div>
+        <div class="stepbar">
+          <button class="btn ghost" id="loopPrev">← 上一行</button>
+          <button class="btn" id="loopNext">下一行 →</button>
+          <span class="dots" id="loopDots"></span>
+        </div>
+        <div class="stepcap" id="loopCap">👆 按「下一行」逐行執行 train_model_simple</div>
+      </div>
+      <div class="note"><b>AdamW 是什麼？</b><span class="en">Adam</span> 家族是訓練深度網路的主流 optimizer（會為每個參數自適應調整學習步伐）；<span class="en">AdamW</span> 改良了 weight decay 的做法——透過懲罰過大的權重來抑制模型複雜度、對抗 overfitting——是訓練 LLM 的標準配備。這裡用 <code class="inl">lr=0.0004, weight_decay=0.1</code>。</div>
+
+      <h3>實際訓練 10 個 epoch（書中真實輸出）</h3>
+      <p>MacBook Air 上約 5 分鐘跑完。<strong>按「下一個 epoch」逐輪觀察</strong>：左邊是 loss 曲線（實心點＝書中印出的值；空心點＝依書中圖 5.12 的平滑內插），下面是該輪結束時模型生成的樣本——看著它從逗號進化成句子：</p>
+      <div class="stage">
+        <div class="controls">
+          <button class="btn ghost" id="epPrev">← 上一個</button>
+          <button class="btn" id="epNext">下一個 epoch →</button>
+          <button class="btn ghost" id="epAll">跑完 10 輪</button>
+          <button class="btn ghost" id="epReset">重置</button>
+          <span class="dots" id="epDots"></span>
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px"><canvas id="trCv" width="860" height="330"></canvas></div>
+        <div class="tsr" id="epConsole" style="margin-top:12px;max-height:150px;overflow-y:auto"></div>
+        <div class="decoded" id="epSample" style="margin-top:10px"></div>
+        <div class="stepcap" id="epCap"></div>
+      </div>
+      <div class="note"><b>把結論記成三句話：</b>① 前兩輪 train/val <b>一起降</b>＝模型真的在學語言的統計規律；② 第 2 輪之後 train 續降、val <b>卡在 6.2–6.5</b>＝之後學到的都是「背課文」；③ 證據確鑿——第 9 輪生成的 "quite insensible to the irony" 可以在《The Verdict》原文<strong>逐字找到</strong>。這叫 <span class="en">memorization</span>（記憶背誦）。</div>
+      <div class="plain"><div class="ph">🔰 那這樣訓練還算成功嗎？</div><p>以教學目的，<b>算</b>：它證明了訓練迴圈正確、模型有能力學會語言結構。overfitting 嚴重是因為<strong>資料太小（5,145 tokens）卻跑了 10 個 epoch</strong>。真實 LLM 的做法相反：資料大到「每句話幾乎只看一次」（常常只訓練 1 個 epoch），自然不容易背起來。想試試大資料？書的附錄 D 提供用 Project Gutenberg 60,000 本書訓練的作法。</p></div>
+    </section>
+
+    <!-- ===== 5.3 ===== -->
+    <section id="sec-53" data-map="s-gen">
+      <div class="sh"><span class="num">5.3</span><h2>Decoding strategies（解碼策略：控制隨機性）<span class="mode infer">💬 推論</span></h2></div>
+      <div class="iocard"><span class="io in">input：最後一格 logits<br>[50257]</span><span class="ioarrow">→</span><span class="io box">top-k 過濾 → ÷temperature → softmax → multinomial 抽樣<small>取代原本的 argmax</small></span><span class="ioarrow">→</span><span class="io out">output：下一個 token<br>（有隨機性、但不亂來）</span></div>
+      <p>剛訓練好的模型有個問題：<code class="inl">generate_text_simple</code> 用 <span class="en">argmax</span>（永遠挑機率最高的字，稱為 <span class="en">greedy decoding</span>），所以<strong>同一個開頭永遠生出同一句話</strong>——而且容易整段背出訓練集原文。解法：把「挑最大」改成「<strong>按機率抽籤</strong>」（<code class="inl">torch.multinomial</code>），再用兩個旋鈕控制抽籤的行為。</p>
+
+      <h3>旋鈕①：temperature scaling<span style="font-weight:400">（把分佈捏尖或壓平）</span></h3>
+      <p>書中用 9 個字的迷你詞彙表示範。模型看到 <code class="inl">"every effort moves you"</code> 之後輸出這排 logits（下方數值），<span class="en">temperature</span> 就是「<strong>把 logits 除以 T 再過 softmax</strong>」。拖動 T，機率分佈即時重算（真實計算）：</p>
+      <div class="stage">
+        <div class="controls" style="gap:14px">
+          <span class="small">temperature T = <b id="tVal" style="color:var(--accent)">1.0</b></span>
+          <input type="range" id="tSlider" min="0.1" max="5" step="0.1" value="1" style="flex:1;min-width:160px">
+          <span class="seg" id="tPre"><button data-t="0.1">T=0.1</button><button data-t="1" class="on">T=1</button><button data-t="5">T=5</button></span>
+          <button class="btn ghost" id="tSample">🎲 抽 1000 次</button>
+        </div>
+        <div class="tsr" style="margin-bottom:10px"><span class="lbl"># next_token_logits（"every effort moves you" 之後，書中數值）</span>
+[4.51, 0.89, -1.90, <span class="tn" style="color:var(--accent);font-weight:700">6.75</span>, 1.63, -1.62, -1.89, 6.28, 1.79]   <span class="lbl"># 最大是 forward（index 3）</span></div>
+        <div id="tBars"></div>
+        <div class="stepcap" id="tCap"></div>
+      </div>
+      <div class="note"><b>對照書中的 torch 實測（T=1、seed 123、抽 1000 次）：</b>573 次量級的 <b>forward</b>、343 次 <b>toward</b>、73 次 <b>closer</b>、2 次 inches、其餘 0 次（實際輸出 582/343/73/2）——大致就是機率 × 1000。本頁的抽樣用瀏覽器內建的固定種子亂數，次數會與 torch 略有出入，分佈趨勢相同。</div>
+
+      <h3>旋鈕②：top-k sampling<span style="font-weight:400">（把長尾直接剁掉）</span></h3>
+      <p>高溫讓輸出多樣，但也讓 <code class="inl">"every effort moves you pizza"</code> 這種蠢話有 ~4% 的機會被抽中。<span class="en">top-k</span> 的對策：<strong>只保留 logits 最高的 k 個字，其他一律設成 −∞</strong>——softmax 後機率變 0，永遠抽不到。拖動 k 看四個步驟（k=3 為書中例子）：</p>
+      <div class="stage">
+        <div class="controls" style="gap:14px">
+          <span class="small">top_k = <b id="kVal" style="color:var(--accent)">3</b></span>
+          <input type="range" id="kSlider" min="1" max="9" step="1" value="3" style="flex:1;min-width:160px">
+          <button class="btn ghost" id="tkDraw">🎲 用最終分佈抽一個字</button>
+        </div>
+        <div class="tsr" id="tkTsr"></div>
+        <div class="decoded" id="tkOut" style="margin-top:10px"><span class="small lbl">every effort moves you </span><span class="nw" id="tkWords">____</span></div>
+        <div class="stepcap" id="tkCap"></div>
+      </div>
+
+      <h3>組裝成新的 generate()</h3>
+      <pre>def generate(model, idx, max_new_tokens, context_size,
+             temperature=<span class="k">0.0</span>, top_k=<span class="k">None</span>, eos_id=None):
+    for _ in range(max_new_tokens):
+        idx_cond = idx[:, -context_size:]
+        with torch.no_grad():
+            logits = model(idx_cond)[:, -1, :]
+        if top_k is not None:                       <span class="c"># ① 先剁長尾</span>
+            top_logits, _ = torch.topk(logits, top_k)
+            logits = torch.where(logits &lt; top_logits[:, -1],
+                                 torch.tensor(float(<span class="k">"-inf"</span>)).to(logits.device), logits)
+        if temperature &gt; 0.0:                       <span class="c"># ② 再調溫、抽籤</span>
+            probs = torch.softmax(logits / temperature, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+        else:                                       <span class="c"># temperature=0 → 回到 argmax（greedy）</span>
+            idx_next = torch.argmax(logits, dim=-1, keepdim=True)
+        if idx_next == eos_id: break                <span class="c"># 遇到結束符提早收工</span>
+        idx = torch.cat((idx, idx_next), dim=1)
+    return idx</pre>
+      <div class="stage"><div class="tsr"><span class="lbl"># 用剛訓練好的模型跑（top_k=25, temperature=1.4, seed 123）——書中真實輸出</span>
+Output text:
+ Every effort moves you <span class="tn" style="color:var(--accent)">stand to work on surprise, a one of us had gone with random-</span>
+
+<span class="lbl"># 不再逐字背訓練集了（對照 greedy 的輸出："know," was one of the axioms he laid...）
+# 文法還怪怪的正常——模型只看過 5,145 個 token。</span></div></div>
+      <div class="note"><b>什麼時候用什麼設定？</b>低 T ＋小 k（甚至 greedy）→ 答案穩定、保守，適合<b>事實型任務</b>；高 T ＋大 k → 多樣、有創意但可能離題，適合<b>創作型任務</b>。<code class="inl">temperature=0.0</code> 完全關閉抽樣、回到確定性的 argmax。</div>
+    </section>
+
+    <!-- ===== 5.4 ===== -->
+    <section id="sec-54" data-map="s-upd">
+      <div class="sh"><span class="num">5.4</span><h2>Loading and saving model weights（權重存讀）</h2></div>
+      <div class="iocard"><span class="io in">input：訓練到一半（或訓練完）的模型</span><span class="ioarrow">→</span><span class="io box">torch.save / torch.load<small>存 state_dict（＋optimizer 的 state_dict）</small></span><span class="ioarrow">→</span><span class="io out">output：.pth 檔<br>下次不用重練</span></div>
+      <p>訓練很貴，練完（或練到一半）當然要存檔。PyTorch 的慣例是存 <span class="en">state_dict</span>——一個「層名 → 權重 tensor」的字典。<strong>點下面 checkpoint 的兩把鑰匙</strong>，看各自裝了什麼、為什麼<strong>續訓時兩個都要存</strong>：</p>
+      <div class="stage">
+        <div class="controls"><span class="small">torch.save({ ... }, "model_and_optimizer.pth")　點一把鑰匙：</span>
+          <button class="pill on" data-k="0" id="ck0">"model_state_dict"</button>
+          <button class="pill" data-k="1" id="ck1">"optimizer_state_dict"</button>
+        </div>
+        <div class="tsr" id="ckTsr"></div>
+        <div class="stepcap" id="ckCap"></div>
+      </div>
+      <pre><span class="c"># 只做推論：存模型就夠</span>
+torch.save(model.state_dict(), "model.pth")
+model = GPTModel(GPT_CONFIG_124M)
+model.load_state_dict(torch.load("model.pth", map_location=device))
+model.<span class="k">eval</span>()                          <span class="c"># 推論前記得關 dropout！</span>
+
+<span class="c"># 要續訓：模型 + optimizer 一起存</span>
+checkpoint = torch.load("model_and_optimizer.pth", map_location=device)
+model.load_state_dict(checkpoint["model_state_dict"])
+optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4, weight_decay=0.1)
+optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+model.<span class="k">train</span>();</pre>
+    </section>
+
+    <!-- ===== 5.5 ===== -->
+    <section id="sec-55" data-map="s-upd,s-gen">
+      <div class="sh"><span class="num">5.5</span><h2>Loading pretrained weights from OpenAI（載入 OpenAI 權重）</h2></div>
+      <div class="iocard"><span class="io in">input：OpenAI 公開的 GPT-2 權重<br>（TensorFlow checkpoint）</span><span class="ioarrow">→</span><span class="io box">load_weights_into_gpt<small>逐層對名字、檢查形狀、搬進我們的 GPTModel</small></span><span class="ioarrow">→</span><span class="io out">output：會講人話的 GPT-2<br>（不用花 $690K）</span></div>
+      <p>OpenAI 公開了 GPT-2 系列的權重。用書中提供的 <code class="inl">gpt_download.py</code> 抓 124M 版本，會下載 7 個檔案：</p>
+      <div class="stage"><div class="tsr"><span class="lbl"># download_and_load_gpt2(model_size="124M", models_dir="gpt2")</span>
+checkpoint                    77 B      <span class="lbl"># TF checkpoint 索引</span>
+encoder.json                1.04 MB     <span class="lbl"># tokenizer 的詞彙表</span>
+hparams.json                  90 B      <span class="lbl"># 架構超參數（見下）</span>
+model.ckpt.data-00000-of-00001  498 MB  <span class="lbl"># 主角：所有權重</span>
+model.ckpt.index            5.21 kB
+model.ckpt.meta              471 kB
+vocab.bpe                    456 kB     <span class="lbl"># BPE 合併規則</span>
+
+settings = {'n_vocab': 50257, 'n_ctx': 1024, 'n_embd': 768, 'n_head': 12, 'n_layer': 12}
+params.keys() = dict_keys(['blocks', 'b', 'g', 'wpe', 'wte'])
+params["wte"].shape = (50257, 768)      <span class="lbl"># token embedding；其餘 value 同為 numpy array</span></div></div>
+      <p><strong>四種尺寸，同一套架構</strong>——差別只在維度與層數（點選查看；粗體為對 124M 的改動）：</p>
+      <div class="stage">
+        <div class="controls" id="szPills">
+          <button class="pill on" data-s="0">gpt2-small · 124M</button>
+          <button class="pill" data-s="1">gpt2-medium · 355M</button>
+          <button class="pill" data-s="2">gpt2-large · 774M</button>
+          <button class="pill" data-s="3">gpt2-xl · 1558M</button>
+        </div>
+        <div class="tsr" id="szTsr"></div>
+        <div class="stepcap" id="szCap"></div>
+      </div>
+      <p>載入前要把我們的 config 改回和 OpenAI 一致——<strong>點每一行看原因</strong>（都是前幾章埋的伏筆）：</p>
+      <div class="stage">
+        <div class="codelines" id="ncLines"></div>
+        <div class="stepcap" id="ncCap">👆 點一行看它為什麼非改不可</div>
+      </div>
+      <h3>把權重「對名入座」：load_weights_into_gpt</h3>
+      <p>OpenAI 的命名和我們不同，得逐層對應、搬運。輔助函數 <code class="inl">assign(left, right)</code> 會先<strong>檢查兩邊形狀一致</strong>才覆蓋——形狀不合就 raise，這是搬權重時最重要的保險。<strong>點一個部件，看它的對應關係：</strong></p>
+      <div class="stage">
+        <div class="controls" id="wmChips">
+          <button class="pill on" data-w="0">Embedding</button>
+          <button class="pill" data-w="1">Attention QKV</button>
+          <button class="pill" data-w="2">Attention 輸出投影</button>
+          <button class="pill" data-w="3">FeedForward</button>
+          <button class="pill" data-w="4">LayerNorm ×2</button>
+          <button class="pill" data-w="5">Final LN ＋ Output head</button>
+        </div>
+        <div class="tsr" id="wmTsr"></div>
+        <div class="stepcap" id="wmCap"></div>
+      </div>
+      <h3>驗收：它會講人話了</h3>
+      <div class="stage"><div class="tsr"><span class="lbl"># generate(gpt, "Every effort moves you", max_new_tokens=25, top_k=50, temperature=1.5)</span>
+Output text:
+ Every effort moves you <span class="tn" style="color:var(--accent);font-weight:700">toward finding an ideal new way to practice something!
+What makes us want to be on top of that?</span></div></div>
+      <div class="note"><b>「能講人話」就是最好的驗收：</b>搬權重的過程只要有一個小 bug（搬錯層、忘了轉置），模型就會胡言亂語。輸出通順的文字，代表全部 197 個權重 tensor（161 個＋qkv_bias 打開後多出的 36 個）對位成功。這個載好權重的模型，就是第 6、7 章微調（fine-tuning）的起點。</div>
+    </section>
+
+    <!-- ===== 小結 ===== -->
+    <section id="sec-sum" data-map="all">
+      <div class="sh"><span class="num">▣</span><h2>本章小結</h2></div>
+      <ul class="clean">
+        <li><b>Loss</b>＝負平均對數機率（cross entropy）：softmax 取 target 機率 → log → 平均 → 取負；未訓練約 10.98 ≈ ln(50257)。<b>perplexity = exp(loss)</b>，讀作「等效在幾個字之間亂猜」。</li>
+        <li><b>資料切分</b>：train 90% / val 10%；val loss 是唯一能誠實回答「有沒有真的學會」的指標。</li>
+        <li><b>訓練迴圈</b>八步：epoch → batch → 清梯度 → forward 算 loss → backward → AdamW 更新 → 定期評估 → 生成樣本肉眼檢查。</li>
+        <li><b>實測 10 epochs</b>：train 9.78 → 0.39、val 卡在 6.45——小資料多 epoch 必然 overfitting，模型逐字背出《The Verdict》。</li>
+        <li><b>解碼策略</b>：multinomial 抽樣取代 argmax；temperature 把分佈捏尖（&lt;1）或壓平（&gt;1）、top-k 把長尾剁掉；T=0 回到 greedy。</li>
+        <li><b>存讀權重</b>：state_dict 是「層名 → tensor」字典；續訓要連 AdamW 的 optimizer state 一起存。</li>
+        <li><b>載入 OpenAI 權重</b>：config 改回 context 1024、qkv_bias=True；assign() 驗形狀、attention 的 c_attn 要 split 成 Q/K/V、out_head 與 wte 共用（weight tying）。</li>
+      </ul>
+    </section>
+
+    <section id="sec-quiz" data-map="all">
+      <div class="sh"><span class="num">✓</span><h2>知識檢核</h2></div>
+      <p class="small" style="margin-bottom:14px">// 七題，作答後立即看解析</p>
+      <div class="quiz" id="quizBox"></div>
+      <div id="score" style="font-family:var(--mono);font-size:14px;color:var(--accent);margin-top:16px"></div>
+    </section>
+
+    <div class="foot">從零打造 LLM · 第 5 章互動教材 ｜ 講解為原創文字，程式碼與數值對應 Sebastian Raschka《Build a Large Language Model (From Scratch)》Ch.5 的公開程式與執行輸出，非原文翻譯<br>頁面中的計算皆為瀏覽器即時運算　·　快捷鍵 <kbd>T</kbd> 切換主題</div>
+  </main>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const root=document.documentElement;
+const css=v=>getComputedStyle(root).getPropertyValue(v).trim();
+$("#themeBtn").addEventListener("click",()=>{const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",cur==="dark"?"light":"dark");});
+addEventListener("keydown",e=>{if(e.target.matches&&e.target.matches("input,textarea"))return;if(e.key==="t"||e.key==="T")$("#themeBtn").click();});
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ===== 全域訓練閉環圖 ===== */
+const STAGES=[
+ {id:"s-data",em:"📚",label:"資料 batch"},{id:"s-fwd",em:"▶",label:"Forward"},{id:"s-loss",em:"🎯",label:"Loss"},
+ {id:"s-bwd",em:"◀",label:"Backward"},{id:"s-upd",em:"🔧",label:"更新權重"},{id:"s-eval",em:"📉",label:"評估"},
+ {id:"s-gen",em:"💬",label:"生成樣本"}];
+$("#mapRow").innerHTML=STAGES.map((s,i)=>`<div class="mapstage" data-id="${s.id}"><span class="em">${s.em}</span>${s.label}</div>`+(i<STAGES.length-1?'<span class="mapsep">›</span>':'<span class="mapsep">↻</span>')).join("");
+$$(".mapstage").forEach(el=>el.addEventListener("click",()=>{const sec=[...$$("section")].find(s=>{const m=s.dataset.map||"";return m!=="all"&&m.split(",").includes(el.dataset.id);});if(sec){sec.scrollIntoView();}else{document.getElementById("sec-52").scrollIntoView();}}));
+function setMap(sec){
+  const raw=(sec&&sec.dataset.map)||"all";
+  const ids=raw==="all"?STAGES.map(s=>s.id):raw.split(",");
+  $$(".mapstage").forEach(el=>el.classList.toggle("lit",ids.includes(el.dataset.id)));
+  if(raw==="all"){$("#mapSub").innerHTML=`預訓練閉環：資料 → forward → loss → backward → 更新權重，循環到收斂（最後的 ↻ 就是迴圈）`;}
+  else{const lbls=ids.map(id=>STAGES.find(s=>s.id===id).label);$("#mapSub").innerHTML=`目前在：<b>${lbls.join(" · ")}</b>`;}
+}
+
+/* ===== 積木進度（7 步驟，圖 5.2）===== */
+const BRICKS=[["1","文字生成回顧","sec-511"],["2","文字評估（loss）","sec-512"],["3","train/val loss","sec-513"],["4","訓練迴圈","sec-52"],["5","解碼策略","sec-53"],["6","權重存讀","sec-54"],["7","OpenAI 權重","sec-55"]];
+$("#bricks").innerHTML=BRICKS.map(b=>`<div class="brick" data-sec="${b[2]}"><span class="ck"></span><span><b>${b[0]}</b> ${b[1]}</span></div>`).join("");
+$$(".brick").forEach(el=>el.addEventListener("click",()=>document.getElementById(el.dataset.sec).scrollIntoView()));
+const SEC_ORDER=["sec-intro","sec-511","sec-512","sec-513","sec-52","sec-53","sec-54","sec-55","sec-sum","sec-quiz"];
+function setBricks(curId){
+  const cur=SEC_ORDER.indexOf(curId);
+  $$(".brick").forEach(el=>{
+    const bi=SEC_ORDER.indexOf(el.dataset.sec);
+    el.classList.toggle("done",cur>bi);
+    el.classList.toggle("now",el.dataset.sec===curId);
+    el.querySelector(".ck").textContent=el.classList.contains("done")?"✓":"";
+  });
+}
+
+/* nav + prog + map + bricks */
+const secs=$$("section, .hero"),links=$$("nav.toc a");
+let secNow="";
+function onScroll(){
+  const h=document.documentElement;$("#prog").style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+"%";
+  let cur=secs[0];for(const s of secs)if(s.getBoundingClientRect().top<=150)cur=s;
+  secNow=cur.id;
+  links.forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+cur.id));
+  setMap(cur.tagName==="SECTION"?cur:null);
+  setBricks(cur.id);
+}
+addEventListener("scroll",onScroll,{passive:true});onScroll();
+
+/* ===== 5.1.1 config explorer ===== */
+const CFG=[
+ ['GPT_CONFIG_124M = {',null],
+ ['    "vocab_size": 50257,','詞彙表大小：和第 4 章相同。loss 的分母世界就是這 50257 種可能。'],
+ ['    "context_length": 256,   # 原本 1024','唯一的改動！上下文長度 1024 → 256：訓練的記憶體與運算需求大減，筆電才跑得動。架構不變，只是 positional embedding 表變短；5.5 載入 OpenAI 權重時會再調回 1024。'],
+ ['    "emb_dim": 768,','embedding 維度：每個 token 768 維，貫穿全模型。'],
+ ['    "n_heads": 12,','注意力頭數：768 維切 12 個頭、每頭 64 維。'],
+ ['    "n_layers": 12,','transformer block 疊 12 層。'],
+ ['    "drop_rate": 0.1,','dropout 10%。順帶一提：現代 LLM 訓練常把 dropout 設 0——資料大到不太需要它。'],
+ ['    "qkv_bias": False','Q/K/V 的 Linear 不加 bias。5.5 載入 OpenAI 權重時要改成 True（原始 GPT-2 有 bias）。'],
+ ['}',null]];
+$("#cfgLines").innerHTML=CFG.map((c,i)=>`<div class="cl" data-i="${i}" style="cursor:${c[1]?'pointer':'default'}">${c[0]}</div>`).join("");
+$$("#cfgLines .cl").forEach(el=>el.addEventListener("click",()=>{
+  const c=CFG[+el.dataset.i];if(!c[1])return;
+  $$("#cfgLines .cl").forEach(x=>x.classList.remove("lit"));el.classList.add("lit");
+  $("#cfgCap").innerHTML="<b>"+c[0].trim().replace(/,\s*#.*$/,"").replace(/,$/,"")+"</b> — "+c[1];
+}));
+
+/* ===== 5.1.1 round-trip 動畫 ===== */
+const rtReduced=matchMedia("(prefers-reduced-motion:reduce)").matches;
+let rtTimer=null;
+const RT_CAPS=[
+ "① 起點：一段普通文字。",
+ "② text_to_token_ids：tiktoken 編碼成 ID，unsqueeze(0) 補上 batch 維 → 形狀 [1, 4]。",
+ "③ generate_text_simple：接龍 10 輪，每輪把整個序列過一次模型、取最後一格 argmax（第 4 章的機制）。",
+ "④ token_ids_to_text 解碼——紅字是模型接的 10 個 token：徹底亂碼，因為權重是隨機的。我們需要一個數字來量化「有多差」。"];
+function rtRender(s){
+  $$("#rt .stg").forEach(el=>el.classList.toggle("lit",+el.dataset.s<=s));
+  $("#rtOut").style.opacity=s>=3?"1":".25";
+  $("#rtCap").innerHTML=s>=0?RT_CAPS[s]:"👆 按「播放」跑一遍：文字 → token ID → 模型生成 → 解碼回文字";
+}
+$("#rtPlay").addEventListener("click",()=>{
+  if(rtTimer){clearInterval(rtTimer);rtTimer=null;}
+  if(rtReduced){rtRender(3);return;}
+  let s=0;rtRender(0);
+  rtTimer=setInterval(()=>{s++;rtRender(s);if(s>=3){clearInterval(rtTimer);rtTimer=null;}},850);
+});
+rtRender(3);
+
+/* ===== 5.1.2 inputs/targets 位置檢視 ===== */
+const B2=[
+ {words:["every","effort","moves"],ids:[16833,3626,6100],tgt:[3626,6100,345],tgtW:["effort","moves","you"]},
+ {words:["I","really","like"],ids:[40,1107,588],tgt:[1107,588,11311],tgtW:["really","like","chocolate"]}];
+function renderIO(hi){
+  $("#inChips").innerHTML=B2.map((s,si)=>
+    `<div style="width:100%;display:flex;gap:7px;align-items:center;flex-wrap:wrap"><span class="small" style="width:56px">text${si+1} =</span>`+
+    s.words.map((w,wi)=>`<span class="wchip ${hi===si+"-"+wi?'hot':''}" data-k="${si}-${wi}">${w}<small>${s.ids[wi]}</small></span>`).join("")+`</div>`).join("");
+  const mk=(arr,si,pfx)=>arr.map((id,i)=>`<span class="tn ${hi===si+"-"+i?'hot':''}" data-k="${si}-${i}">${String(id).padStart(5)}</span>`).join(`<span class="pn">,</span>`);
+  $("#ioTsr").innerHTML=`<span class="lbl"># inputs（模型看到的）              # targets（右移一格＝該預測的答案）</span>
+tensor([<span class="pn">[</span>${mk(B2[0].ids,0)}<span class="pn">],</span>      tensor([<span class="pn">[</span>${mk(B2[0].tgt,"t0")}<span class="pn">],</span>
+        <span class="pn">[</span>${mk(B2[1].ids,1)}<span class="pn">]])</span>              <span class="pn">[</span>${mk(B2[1].tgt,"t1")}<span class="pn">]])</span>`;
+  $$("#inChips .wchip, #ioTsr .tn").forEach(el=>{
+    el.addEventListener("mouseenter",()=>hiIO(el.dataset.k));
+    el.addEventListener("mouseleave",()=>hiIO(null));
+  });
+}
+function hiIO(k){
+  if(k&&k[0]==="t"){k=k[1]+"-"+k.split("-")[1];}
+  $$("#inChips .wchip, #ioTsr .tn").forEach(el=>{
+    const ek=el.dataset.k||"";
+    const norm=ek[0]==="t"?ek[1]+"-"+ek.split("-")[1]:ek;
+    el.classList.toggle("hot",k!==null&&norm===k);
+  });
+  if(k){
+    const[si,wi]=k.split("-").map(Number);const s=B2[si];
+    const seen=s.words.slice(0,wi+1).join(" ");
+    $("#ioNote").innerHTML=`位置 ${wi+1}：模型只看得到「<b>${seen}</b>」→ 該預測的 target 是「<b>${s.tgtW[wi]}</b>」（ID ${s.tgt[wi]}）。一句 3 個 token＝3 筆訓練樣本。`;
+  } else $("#ioNote").textContent="滑過上面任何一個字試試 →";
+}
+renderIO(null);
+
+/* ===== 5.1.2 機率矩陣（7 字迷你詞彙表，書中示意值）===== */
+const V7=["a","effort","every","forward","moves","you","zoo"];
+const PM_IN=["every","effort","moves"],PM_TGT=[1,4,5];
+const PM_U=[[0.14,0.14,0.13,0.17,0.15,0.13,0.14],[0.15,0.13,0.13,0.16,0.14,0.15,0.14],[0.13,0.14,0.15,0.16,0.15,0.13,0.14]];
+const PM_T=[[0.10,0.60,0.20,0.05,0.00,0.02,0.01],[0.06,0.07,0.01,0.26,0.35,0.13,0.12],[0.01,0.10,0.10,0.20,0.12,0.34,0.13]];
+let pmMode=0;
+function renderPM(){
+  const M=pmMode?PM_T:PM_U;
+  let t=`<tr><th>輸入位置＼詞彙</th>`+V7.map((w,i)=>`<th>${i}<br>"${w}"</th>`).join("")+`<th>argmax 會選</th><th>target</th></tr>`;
+  M.forEach((row,ri)=>{
+    const amx=row.indexOf(Math.max(...row));
+    t+=`<tr><th>${ri+1}·看完 "${PM_IN.slice(0,ri+1).join(" ")}"</th>`+
+      row.map((v,ci)=>`<td class="${ci===PM_TGT[ri]?'tgt':''} ${ci===amx?'amx':''} ${v<0.05?'dim':''}">${v.toFixed(2)}</td>`).join("")+
+      `<td class="${amx===PM_TGT[ri]?'':'dim'}" style="font-weight:700;color:${amx===PM_TGT[ri]?'var(--ok)':'var(--bad)'}">"${V7[amx]}" ${amx===PM_TGT[ri]?'✓':'✗'}</td><td style="color:var(--accent);font-weight:700">"${V7[PM_TGT[ri]]}"</td></tr>`;
+  });
+  $("#pmTable").innerHTML=t;
+  $("#pmCap").innerHTML=pmMode
+   ?`<b>理想訓練後</b>：黃框（target）的機率被推到每列最高——argmax 選出 "effort moves you" 全對。訓練的本質就是<b>把黃框裡的數字愈推愈高</b>（它們的機率上升，其他字自然下降，因為每列總和固定是 1）。`
+   :`<b>未訓練</b>：7 個字的機率全擠在 1/7 ≈ 0.14 附近（隨機權重＝毫無頭緒），argmax 三列都選錯。注意黃框——loss 只關心<b>這三個格子</b>的數值。`;
+}
+$$("#pmSeg button").forEach(b=>b.addEventListener("click",()=>{$$("#pmSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");pmMode=+b.dataset.m;renderPM();}));
+renderPM();
+
+/* ===== 5.1.2 loss 六步 stepper（書中真實數值）===== */
+const LS_STEPS=6;let lsStep=0;
+const TP1=["7.4541e-05","3.1061e-05","1.1563e-05"],TP2=["1.0337e-05","5.6776e-05","4.7559e-06"];
+const LOGP=["-9.5042","-10.3796","-11.3677","-11.4798","-9.7764","-12.2561"];
+function renderLS(){
+  let h="";
+  h+=`<span class="lbl"># step 1 — softmax 後，只挑出 target 位置的機率（每句 3 個）</span>\ntarget_probas_1 = [${TP1.map(v=>`<span class="tn">${v}</span>`).join(", ")}]   <span class="lbl"># "every effort moves" 那句</span>\ntarget_probas_2 = [${TP2.map(v=>`<span class="tn">${v}</span>`).join(", ")}]   <span class="lbl"># "I really like" 那句</span>`;
+  if(lsStep>=1)h+=`\n\n<span class="lbl"># step 2 — 取 log（把連乘變連加、小數字展開）</span>\nlog_probas = [${LOGP.map(v=>`<span class="tn neg">${v}</span>`).join(", ")}]`;
+  if(lsStep>=2)h+=`\n\n<span class="lbl"># step 3 — 六個數字平均成一個</span>\navg_log_probas = <span class="tn neg">-10.7940</span>`;
+  if(lsStep>=3)h+=`\n\n<span class="lbl"># step 4 — 乘上 −1（慣例：把「最大化」改成「最小化」）</span>\nneg_avg_log_probas = <span class="tn" style="color:var(--accent);font-weight:700">10.7940</span>   <span class="lbl"># ← 這就是 cross entropy loss</span>`;
+  if(lsStep>=4)h+=`\n\n<span class="lbl"># step 5 — 驗證：F.cross_entropy 一行算出同樣的值</span>\nloss = F.cross_entropy(logits.flatten(0,1), targets.flatten())  <span class="lbl"># [6,50257] vs [6]</span>\n     = tensor(<span class="tn" style="color:var(--accent);font-weight:700">10.7940</span>)  ✓`;
+  if(lsStep>=5)h+=`\n\n<span class="lbl"># step 6 — 白話翻譯：perplexity</span>\nperplexity = torch.exp(loss) = <span class="tn" style="color:var(--bad);font-weight:700">48725.8203</span>   <span class="lbl"># 等效在 48,725 個字裡亂猜（詞彙表共 50,257）</span>`;
+  $("#lsTsr").innerHTML=h;
+  const caps=[
+   "<b>step 1</b>：六個 target 機率全在 0.00001 量級——恰好是 1/50257 ≈ 0.00002 的隨機水準。訓練目標：把這六個數字推向 1。",
+   "<b>step 2</b>：取 log。機率愈接近 1，log 愈接近 0；機率愈小，log 愈負。之後在機率的連乘＝log 的連加，優化好算得多。",
+   "<b>step 3</b>：平均——整批資料的表現濃縮成一個數字 −10.7940。",
+   "<b>step 4</b>：乘 −1 → 10.7940。「負平均對數機率」有個更響亮的名字：<b>cross entropy loss</b>。愈小愈好、完美時為 0。",
+   "<b>step 5</b>：PyTorch 的 F.cross_entropy 把 step 1–4 全包（還更數值穩定）。注意要先 flatten：logits [2,3,50257]→[6,50257]、targets [2,3]→[6]。",
+   "<b>step 6</b>：perplexity = e^loss ≈ 48,726——「模型每一步都像在 48,726 個字裡亂猜」。比 10.79 這個抽象數字直觀多了。"];
+  $("#lsCap").innerHTML=caps[lsStep];
+  $("#lsDots").innerHTML=Array.from({length:LS_STEPS},(_,i)=>`<span class="dot2 ${i===lsStep?'on':''}"></span>`).join("");
+  $("#lsPrev").disabled=lsStep===0;$("#lsNext").disabled=lsStep===LS_STEPS-1;
+}
+$("#lsNext").addEventListener("click",()=>{if(lsStep<LS_STEPS-1){lsStep++;renderLS();}});
+$("#lsPrev").addEventListener("click",()=>{if(lsStep>0){lsStep--;renderLS();}});
+renderLS();
+
+/* ===== 5.1.2 perplexity 標尺 ===== */
+const PX_MARKS=[[0,"loss 0 → ppl 1（完美）"],[0.391,"0.39：本章 train 終點"],[6.452,"6.45：本章 val 終點"],[10.79,"10.79：未訓練"],[10.825,""]];
+function fmtPpl(p){return p>=1000?Math.round(p).toLocaleString("en-US"):p.toFixed(2);}
+function renderPX(){
+  const L=parseFloat($("#pxSlider").value);$("#pxVal").textContent=L.toFixed(2);
+  const ppl=Math.exp(L);$("#pxPpl").textContent=fmtPpl(ppl);
+  const pos=v=>(v/11*100).toFixed(2)+"%";
+  $("#pxTrack").innerHTML=PX_MARKS.filter(m=>m[1]).map(m=>`<div class="pxmark" style="left:${pos(m[0])}"><span>${m[1]}</span></div>`).join("")+
+    `<div class="pxdot" style="left:${pos(L)}"></div>`;
+  $("#pxCap").innerHTML=L>9?`loss ${L.toFixed(2)} → ppl <b>${fmtPpl(ppl)}</b>：接近詞彙表大小 50,257＝純亂猜。未訓練模型就在這裡。`
+    :L>5?`loss ${L.toFixed(2)} → ppl <b>${fmtPpl(ppl)}</b>：比亂猜好非常多，但仍相當不確定——本章訓練後的 <b>val loss 6.45（ppl ≈ 634）</b>就落在這區：對沒讀過的文字，模型還是很掙扎。`
+    :L>1?`loss ${L.toFixed(2)} → ppl <b>${fmtPpl(ppl)}</b>：每步只在少數幾個候選字之間猶豫，生成已相當流暢。`
+    :`loss ${L.toFixed(2)} → ppl <b>${fmtPpl(ppl)}</b>：幾乎每個字都篤定——本章 <b>train loss 0.39（ppl ≈ 1.48）</b>就在這區，但那是「把 5,145 個 token 背下來」的篤定，不是語言能力。`;
+}
+$("#pxSlider").addEventListener("input",renderPX);
+renderPX();
+
+/* ===== 5.1.3 train/val split ===== */
+const TOK_TOTAL=5145,WLEN=256,BSZ=2;
+function renderSP(){
+  const r=parseFloat($("#spSlider").value);$("#spVal").textContent=r.toFixed(2);
+  const trTok=Math.floor(TOK_TOTAL*r),vaTok=TOK_TOTAL-trTok;
+  const trW=Math.floor(trTok/WLEN),vaW=Math.floor(vaTok/WLEN);
+  const trB=Math.floor(trW/BSZ),vaB=Math.ceil(vaW/BSZ);           // train drop_last=True / val drop_last=False
+  const trDrop=trW-trB*BSZ;
+  let h="";
+  for(let i=0;i<trB*BSZ;i++)h+=`<span class="win" title="train 視窗 ${i+1}"></span>`;
+  for(let i=0;i<trDrop;i++)h+=`<span class="win drop" title="湊不滿 batch，被 drop_last 丟棄"></span>`;
+  h+=`<span class="small" style="margin:0 4px">│ split</span>`;
+  for(let i=0;i<vaW;i++)h+=`<span class="win val" title="val 視窗 ${i+1}"></span>`;
+  $("#spWins").innerHTML=h;
+  $("#spCap").innerHTML=`train_ratio=<b>${r.toFixed(2)}</b> → train ${trTok.toLocaleString("en-US")} tokens ＝ <b>${trW} 個視窗</b> → batch_size=2、drop_last=True → <b>${trB} 個 train batch</b>（形狀 [2, 256]）${trDrop?`、${trDrop} 個視窗被丟棄`:""}；val ${vaTok.toLocaleString("en-US")} tokens → ${vaW} 個視窗 → <b>${vaB} 個 val batch</b>。${Math.abs(r-0.9)<0.001?"← 書中設定：9 個 train batch＋1 個 val batch。":""}${vaW<=2?" <b style='color:var(--bad)'>注意：val 這麼小，估出來的 val loss 會抖動——教學示範可接受，實務上 val 要夠大。</b>":""}`;
+}
+$("#spSlider").addEventListener("input",renderSP);
+renderSP();
+
+/* ===== 5.2 訓練迴圈 stepper ===== */
+const LOOP=[
+ ["def train_model_simple(model, train_loader, val_loader, optimizer,","入口：模型、兩個 loader、optimizer 全部到齊。",null],
+ ["                       device, num_epochs, eval_freq, eval_iter,","num_epochs=10、eval_freq=5（每 5 步評估）、eval_iter=5（評估時各抽 5 個 batch 估 loss）。",null],
+ ["                       start_context, tokenizer):","start_context=\"Every effort moves you\"——每輪結束用它生成樣本。",null],
+ ["    for epoch in range(num_epochs):","epoch 迴圈：訓練資料完整走一遍＝1 epoch，共 10 次。","s-data"],
+ ["        model.train()","切訓練模式：啟用 dropout（對照：評估時要切回 eval）。",null],
+ ["        for input_batch, target_batch in train_loader:","batch 迴圈：每次取 [2, 256] 的 inputs 和右移一格的 targets——每 epoch 有 9 個 batch。","s-data"],
+ ["            optimizer.zero_grad()","清掉上一輪的梯度。不清會累加，方向就錯了。",null],
+ ["            loss = calc_loss_batch(input_batch, target_batch, model, device)","forward：跑模型、算這個 batch 的 cross entropy（5.1.2 的六步）。","s-fwd"],
+ ["            loss.backward()","backward：反向傳播，算出全部 163M 個權重的梯度（第 4 章補充節的機制，PyTorch 自動完成）。","s-bwd"],
+ ["            optimizer.step()","AdamW 沿梯度反方向更新所有權重——模型「學到了一點」。","s-upd"],
+ ["            tokens_seen += input_batch.numel()","記帳：又看過 2×256=512 個 token。",null],
+ ["            global_step += 1",null,null],
+ ["            if global_step % eval_freq == 0:","每 5 步做一次體檢：","s-eval"],
+ ["                train_loss, val_loss = evaluate_model(...)","evaluate_model 內部：model.eval() + torch.no_grad()（關 dropout、不追蹤梯度），量完切回 train。兩條 loss 曲線的資料點就是這裡來的。","s-eval"],
+ ["        generate_and_print_sample(model, tokenizer, device, start_context)","每個 epoch 結束生成 50 個 token 的樣本——數字之外，肉眼直接看它進步。","s-gen"],
+ ["    return train_losses, val_losses, track_tokens_seen","回傳三條記錄，等下畫圖用。",null]];
+let loopI=-1;
+$("#loopLines").innerHTML=LOOP.map((l,i)=>`<div class="cl" data-i="${i}">${l[0].replace(/</g,"&lt;")}</div>`).join("");
+function renderLoop(){
+  $$("#loopLines .cl").forEach((el,i)=>el.classList.toggle("lit",i===loopI));
+  const cap=loopI>=0?LOOP[loopI][1]:null;
+  $("#loopCap").innerHTML=cap?("<b>"+LOOP[loopI][0].trim().slice(0,46)+(LOOP[loopI][0].trim().length>46?"…":"")+"</b> — "+cap):"👆 按「下一行」逐行執行 train_model_simple";
+  $("#loopPrev").disabled=loopI<=0;$("#loopNext").disabled=loopI===LOOP.length-1;
+  $("#loopDots").innerHTML=Array.from({length:LOOP.length},(_,i)=>`<span class="dot2 ${i===loopI?'on':''}"></span>`).join("");
+  const st=loopI>=0?LOOP[loopI][2]:null;
+  if(st&&secNow==="sec-52"){const lbl=STAGES.find(s=>s.id===st).label;$("#mapSub").innerHTML=`訓練迴圈目前在：<b>${lbl}</b>（第 ${loopI+1} 行）`;}
+}
+$("#loopNext").addEventListener("click",()=>{if(loopI<LOOP.length-1){loopI++;while(loopI<LOOP.length-1&&!LOOP[loopI][1])loopI++;renderLoop();}});
+$("#loopPrev").addEventListener("click",()=>{if(loopI>0){loopI--;while(loopI>0&&!LOOP[loopI][1])loopI--;renderLoop();}});
+renderLoop();
+
+/* ===== 5.2 訓練播放器（書中真實數值＋圖 5.12 內插）===== */
+const TR_STEPS=[0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85];
+const TR_TRAIN=[9.781,8.111,6.661,5.961,5.42,4.89,4.38,3.90,3.42,2.96,2.52,2.11,1.72,1.36,1.05,0.78,0.541,0.391];
+const TR_VAL=[9.933,8.339,7.048,6.616,6.44,6.31,6.22,6.17,6.15,6.16,6.19,6.23,6.27,6.31,6.34,6.37,6.393,6.452];
+const TR_BOOK=[1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1];
+const EP_SAMPLES={
+ 0:['未訓練','Every effort moves you<span class="bad2"> rentingetic wasn? refres RexMeCHicular stren</span>','起點：亂碼（5.1.1 看過的老朋友）。loss ≈ 10.98。'],
+ 1:['Ep 1','Every effort moves you<span class="nw">,,,,,,,,,,,,.</span>','模型學到的第一課：「逗號很常見」。loss 9.78 → 8.1，有在動，但只會標點。'],
+ 2:['Ep 2','Every effort moves you<span class="nw">, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and, and,, and, and,</span>','第二課：「and 是高頻字」。注意——<b>val loss 差不多就降到底了</b>（6.6 左右），接下來的進步都只發生在訓練集上。'],
+ 9:['Ep 9','Every effort moves you<span class="nw">?"  "Yes--quite insensible to the irony. She wanted him vindicated--and by me!"  He laughed again, and threw back the window-curtains, I had the donkey. "There were days when I</span>','看起來會寫小說了？其實 "quite insensible to the irony" 是《The Verdict》的<b>原文</b>——模型在逐字背誦，不是創作。'],
+ 10:['Ep 10','Every effort moves you<span class="nw"> know," was one of the axioms he laid down across the Sevres and silver of an exquisitely appointed luncheon-table, when, on a later day, I had again run over from Monte Carlo; and Mrs. Gis</span>','終點：train 0.39（ppl 1.48，幾乎全背熟）vs val 6.45（ppl 634，沒讀過的照樣不會）——教科書級的 overfitting。']};
+const EP_MID='（Ep 3–8 的樣本書中省略：文法逐輪成形、背誦逐輪加深）';
+const CONSOLE_LINES=[
+ [1,"Ep 1 (Step 000000): Train loss 9.781, Val loss 9.933"],
+ [1,"Ep 1 (Step 000005): Train loss 8.111, Val loss 8.339"],
+ [2,"Ep 2 (Step 000010): Train loss 6.661, Val loss 7.048"],
+ [2,"Ep 2 (Step 000015): Train loss 5.961, Val loss 6.616"],
+ [3,"[...]　# Ep 3–8 的中間輸出，書中省略"],
+ [9,"Ep 9 (Step 000080): Train loss 0.541, Val loss 6.393"],
+ [10,"Ep 10 (Step 000085): Train loss 0.391, Val loss 6.452"]];
+let epoch=0;
+const trCv=$("#trCv"),trx=trCv.getContext("2d");
+function drawTR(){
+  const W=trCv.width,H=trCv.height,padL=46,padR=16,padT=24,padB=40;
+  trx.clearRect(0,0,W,H);
+  const X=st=>padL+st/85*(W-padL-padR),Y=v=>padT+(1-v/10.5)*(H-padT-padB);
+  trx.font="10px ui-monospace";trx.lineWidth=1;
+  for(const g of [0,2,4,6,8,10]){trx.strokeStyle=css("--line");trx.globalAlpha=.35;trx.beginPath();trx.moveTo(padL,Y(g));trx.lineTo(W-padR,Y(g));trx.stroke();trx.globalAlpha=1;trx.fillStyle=css("--faint");trx.fillText(g,padL-18,Y(g)+3);}
+  for(let e=0;e<=10;e+=2){const st=Math.min(85,e*9);trx.fillStyle=css("--faint");trx.fillText("Ep"+e,X(st)-8,H-padB+14);}
+  trx.fillStyle=css("--faint");trx.fillText("loss",8,16);trx.fillText("epochs →",W/2-20,H-8);
+  const maxStep=epoch===0?-1:Math.min(85,epoch*9-1);
+  // overfitting 分界線
+  if(epoch>=3){trx.strokeStyle=css("--bad");trx.setLineDash([4,4]);trx.globalAlpha=.6;trx.beginPath();trx.moveTo(X(18),padT);trx.lineTo(X(18),H-padB);trx.stroke();trx.setLineDash([]);trx.globalAlpha=1;trx.fillStyle=css("--bad");trx.fillText("≈Ep2 之後 val 不再下降",X(18)+5,padT+10);}
+  function curve(data,color,dash){
+    trx.strokeStyle=color;trx.lineWidth=2.4;if(dash)trx.setLineDash([6,4]);
+    trx.beginPath();let started=false;
+    TR_STEPS.forEach((st,i)=>{if(st>maxStep)return;const x=X(st),y=Y(data[i]);started?trx.lineTo(x,y):trx.moveTo(x,y);started=true;});
+    trx.stroke();trx.setLineDash([]);
+    TR_STEPS.forEach((st,i)=>{if(st>maxStep)return;const x=X(st),y=Y(data[i]);
+      trx.beginPath();trx.arc(x,y,3.4,0,7);
+      if(TR_BOOK[i]){trx.fillStyle=color;trx.fill();}
+      else{trx.fillStyle=css("--surface-2");trx.fill();trx.strokeStyle=color;trx.lineWidth=1.4;trx.stroke();}});
+  }
+  if(epoch>=1){curve(TR_VAL,css("--cool"),true);curve(TR_TRAIN,css("--accent"),false);}
+  trx.font="12px ui-monospace";
+  trx.fillStyle=css("--accent");trx.fillText("── train loss",W-padR-150,20);
+  trx.fillStyle=css("--cool");trx.fillText("╌╌ val loss",W-padR-150,38);
+  if(epoch===0){trx.fillStyle=css("--faint");trx.fillText("按「下一個 epoch」開始訓練",W/2-90,H/2);}
+}
+function renderEP(){
+  drawTR();
+  $("#epDots").innerHTML=Array.from({length:11},(_,i)=>`<span class="dot2 ${i===epoch?'on':''}"></span>`).join("");
+  const lines=CONSOLE_LINES.filter(l=>l[0]<=epoch).map(l=>l[1]);
+  $("#epConsole").innerHTML=`<span class="lbl"># train_model_simple(...) 的即時輸出（書中真實數值）</span>\n`+(lines.length?lines.join("\n"):"<span class='pn'>（尚未開始）</span>");
+  const sm=EP_SAMPLES[epoch];
+  if(sm){$("#epSample").innerHTML=`<span class="small lbl">${sm[0]} 生成樣本 → </span>"${sm[1]}"`;$("#epCap").innerHTML=sm[2];}
+  else{$("#epSample").innerHTML=`<span class="small lbl">Ep ${epoch} 生成樣本 → </span><span class="small">${EP_MID}</span>`;
+    const li=Math.min(17,Math.floor((epoch*9-1)/5));
+    $("#epCap").innerHTML=`Ep ${epoch}：train loss 續降（≈${TR_TRAIN[li].toFixed(2)}）、val loss 幾乎不動（≈${TR_VAL[li].toFixed(2)}）——差距持續擴大＝背誦持續加深。空心點為依書中圖 5.12 的平滑內插值。`;}
+  $("#epPrev").disabled=epoch===0;$("#epNext").disabled=epoch===10;
+  const con=$("#epConsole");con.scrollTop=con.scrollHeight;
+}
+$("#epNext").addEventListener("click",()=>{if(epoch<10){epoch++;renderEP();}});
+$("#epPrev").addEventListener("click",()=>{if(epoch>0){epoch--;renderEP();}});
+$("#epAll").addEventListener("click",()=>{epoch=10;renderEP();});
+$("#epReset").addEventListener("click",()=>{epoch=0;renderEP();});
+renderEP();
+
+/* ===== 5.3 temperature ===== */
+const V9=["closer","every","effort","forward","inches","moves","pizza","toward","you"];
+const L9=[4.51,0.89,-1.90,6.75,1.63,-1.62,-1.89,6.28,1.79];
+function softmaxT(logits,T){const m=Math.max(...logits.map(v=>v/T));const ex=logits.map(v=>Math.exp(v/T-m));const s=ex.reduce((a,b)=>a+b,0);return ex.map(v=>v/s);}
+let tCounts=null;
+function renderT(){
+  const T=parseFloat($("#tSlider").value);$("#tVal").textContent=T.toFixed(1);
+  const p=softmaxT(L9,T);const amx=p.indexOf(Math.max(...p));
+  $("#tBars").innerHTML=V9.map((w,i)=>{
+    const pct=(p[i]*100);
+    return `<div class="pbrow ${i===amx?'amx':''}"><span>${w}</span><div class="barwrap"><div class="bar" style="width:${Math.max(0.5,pct)}%"></div></div><span class="cnum">${pct<0.005?"0.00":pct.toFixed(2)}%${tCounts?`　<b style="color:var(--accent)">${tCounts[i]}×</b>`:""}</span></div>`;
+  }).join("");
+  $$("#tPre button").forEach(b=>b.classList.toggle("on",Math.abs(parseFloat(b.dataset.t)-T)<0.001));
+  $("#tCap").innerHTML=T<0.5
+   ?`T=${T.toFixed(1)} <b>「低溫」</b>：logits 除以小數字＝差距被放大 → softmax 後分佈變得非常尖，幾乎 100% 選 forward——行為趨近 argmax（greedy）。穩定但無聊。`
+   :T<1.5?`T=${T.toFixed(1)}：接近原始分佈。forward 約 ${ (p[3]*100).toFixed(0)}%、toward 約 ${(p[7]*100).toFixed(0)}%、closer 約 ${(p[0]*100).toFixed(0)}%——multinomial 大部分抽到 forward，偶爾抽到別的字，增添變化。`
+   :`T=${T.toFixed(1)} <b>「高溫」</b>：logits 差距被壓縮 → 分佈趨向均勻，長尾的怪字也有機會出線——注意 <b>pizza 已有 ${(p[6]*100).toFixed(1)}%</b>：「every effort moves you pizza」就是這麼來的。多樣，但容易語無倫次。`;
+}
+$("#tSlider").addEventListener("input",()=>{tCounts=null;renderT();});
+$$("#tPre button").forEach(b=>b.addEventListener("click",()=>{$("#tSlider").value=b.dataset.t;tCounts=null;renderT();}));
+$("#tSample").addEventListener("click",()=>{
+  const T=parseFloat($("#tSlider").value);const p=softmaxT(L9,T);
+  const R=mulberry32(123);tCounts=new Array(9).fill(0);
+  for(let n=0;n<1000;n++){let r=R(),acc=0,pick=8;for(let i=0;i<9;i++){acc+=p[i];if(r<acc){pick=i;break;}}tCounts[pick]++;}
+  renderT();
+});
+renderT();
+
+/* ===== 5.3 top-k ===== */
+let tkPicks=[];
+function renderTK(){
+  const k=+$("#kSlider").value;$("#kVal").textContent=k;
+  const sorted=[...L9].map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]);
+  const kept=new Set(sorted.slice(0,k).map(x=>x[1]));
+  const minKept=sorted[k-1][0];
+  const masked=L9.map((v,i)=>kept.has(i)?v:-Infinity);
+  const keptVals=L9.filter((_,i)=>kept.has(i));
+  const m=Math.max(...keptVals);const ex=L9.map((v,i)=>kept.has(i)?Math.exp(v-m):0);const s=ex.reduce((a,b)=>a+b,0);
+  const p=ex.map(v=>v/s);
+  const fmtRow=vals=>vals.map((v,i)=>{
+    const t=v===-Infinity?"-inf":(typeof v==="string"?v:v.toFixed(2));
+    return `<span style="${kept.has(i)?'color:var(--accent);font-weight:600':'opacity:.35'}">${t.padStart(6)}</span>`;
+  }).join(" ");
+  $("#tkTsr").innerHTML=`<span class="lbl">#            ${V9.map(w=>w.slice(0,6).padStart(6)).join(" ")}</span>
+<span class="lbl"># ① logits</span>
+  ${fmtRow(L9)}
+<span class="lbl"># ② torch.topk(logits, ${k}) → 第 ${k} 高的 logit 是 ${minKept.toFixed(2)}，低於它的全部出局</span>
+<span class="lbl"># ③ torch.where(logits &lt; ${minKept.toFixed(2)}, -inf, logits)</span>
+  ${fmtRow(masked)}
+<span class="lbl"># ④ softmax → 被 mask 的機率精確為 0，倖存者重新分配到總和 1</span>
+  ${fmtRow(p.map(v=>v===0?"0.00":v.toFixed(3)))}`;
+  $("#tkCap").innerHTML=k===3
+   ?`<b>k=3（書中例子）</b>：只有 forward（0.577）、toward（0.361）、closer（0.062）倖存——正是書中輸出 [0.0615, 0.5775, 0.3610]。再怎麼抽都抽不到 pizza 了。這個 -inf 手法眼熟嗎？第 3 章的 causal mask 用的是同一招。`
+   :k===1?`<b>k=1</b>：只剩 forward，機率 1.0——等價於 argmax（greedy）。`
+   :k===9?`<b>k=9</b>：全部保留＝沒有過濾，回到純 temperature 抽樣。`
+   :`<b>k=${k}</b>：保留前 ${k} 名。k 愈小愈保守、k 愈大愈開放——與 temperature 一起用（先 top-k 再調溫）就是 generate() 的完整配方。`;
+  $("#tkWords").textContent=tkPicks.length?tkPicks.join(" · "):"____";
+  window.__tkP=p;
+}
+$("#kSlider").addEventListener("input",()=>{tkPicks=[];renderTK();});
+let tkRand=mulberry32(777);
+$("#tkDraw").addEventListener("click",()=>{
+  const p=window.__tkP;let r=tkRand(),acc=0,pick=0;
+  for(let i=0;i<9;i++){acc+=p[i];if(r<acc){pick=i;break;}}
+  tkPicks.push(V9[pick]);if(tkPicks.length>6)tkPicks.shift();
+  renderTK();
+});
+renderTK();
+
+/* ===== 5.4 checkpoint explorer ===== */
+const CK=[
+`<span class="lbl"># model.state_dict()——「層名 → 權重 tensor」的字典（共 161 個 entry）</span>
+"tok_emb.weight"                    → tensor [50257, 768]
+"pos_emb.weight"                    → tensor [256, 768]
+"trf_blocks.0.att.W_query.weight"   → tensor [768, 768]
+"trf_blocks.0.att.W_key.weight"     → tensor [768, 768]
+"trf_blocks.0.ff.layers.0.weight"   → tensor [3072, 768]
+<span class="pn">  ... （12 個 block × 13 個 tensor）...</span>
+"final_norm.scale"                  → tensor [768]
+"out_head.weight"                   → tensor [50257, 768]`,
+`<span class="lbl"># optimizer.state_dict()——AdamW 的「學習狀態」</span>
+"state": {
+    0: { "exp_avg":    tensor [50257, 768],   <span class="lbl"># 一階動量：梯度的移動平均（慣性方向）</span>
+         "exp_avg_sq": tensor [50257, 768] }, <span class="lbl"># 二階動量：梯度平方的移動平均（各參數的步伐大小）</span>
+    <span class="pn">... 每個參數各一份 ...</span>
+}
+"param_groups": [{ "lr": 0.0004, "weight_decay": 0.1, ... }]`];
+const CK_CAPS=[
+ "<b>model_state_dict</b>：模型的全部知識。只做推論的話，存這個就夠——載入後記得 <b>model.eval()</b> 關掉 dropout。",
+ "<b>optimizer_state_dict</b>：AdamW 為<b>每個參數</b>維護的動量記錄，大小和模型本身相當。續訓時若不還原它，optimizer 從零重新摸索各參數的步伐，模型可能學壞甚至無法收斂——所以<b>續訓必存</b>。"];
+function renderCK(k){
+  $("#ck0").classList.toggle("on",k===0);$("#ck1").classList.toggle("on",k===1);
+  $("#ckTsr").innerHTML=CK[k];$("#ckCap").innerHTML=CK_CAPS[k];
+}
+$("#ck0").addEventListener("click",()=>renderCK(0));
+$("#ck1").addEventListener("click",()=>renderCK(1));
+renderCK(0);
+
+/* ===== 5.5 尺寸選擇 ===== */
+const SZ=[
+ ["gpt2-small (124M)",768,12,12,"我們一直在用的尺寸。7 個檔案共 ~500 MB。"],
+ ["gpt2-medium (355M)",1024,24,16,"維度 +33%、層數翻倍。"],
+ ["gpt2-large (774M)",1280,36,20,"接近下一個量級。"],
+ ["gpt2-xl (1558M)",1600,48,25,"GPT-2 全家最大。載入方式與 124M 完全相同——只要改 model_size 參數。"]];
+function renderSZ(i){
+  $$("#szPills .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  const s=SZ[i],base=SZ[0];
+  const hl=(v,b)=>v===b?String(v):`<b style="color:var(--accent)">${v}</b>`;
+  $("#szTsr").innerHTML=`model_configs["${s[0]}"] = {
+    "emb_dim":  ${hl(s[1],base[1])},     <span class="lbl"># 每個 token 的向量維度</span>
+    "n_layers": ${hl(s[2],base[2])},      <span class="lbl"># transformer block 層數</span>
+    "n_heads":  ${hl(s[3],base[3])},      <span class="lbl"># 注意力頭數</span>
+}   <span class="lbl"># vocab_size 50257 與 context_length 1024 四個尺寸皆相同</span>`;
+  $("#szCap").innerHTML=`<b>${s[0]}</b>：${s[4]} 架構（第 4 章的 GPTModel）完全不用改——這就是「同一套架構、不同規模」的可擴展性。`;
+}
+$$("#szPills .pill").forEach((b,i)=>b.addEventListener("click",()=>renderSZ(i)));
+renderSZ(0);
+
+/* ===== 5.5 NEW_CONFIG ===== */
+const NC=[
+ ['NEW_CONFIG = GPT_CONFIG_124M.copy()','從 5.1 的 config 出發，只改需要的。'],
+ ['NEW_CONFIG.update(model_configs["gpt2-small (124M)"])','套上所選尺寸的 emb_dim / n_layers / n_heads（124M 恰好和原本相同）。'],
+ ['NEW_CONFIG.update({"context_length": 1024})','把 5.1 為了省算力調小的 256 <b>改回 1024</b>——OpenAI 的權重（尤其 positional embedding 表 wpe，形狀 [1024, 768]）是按 1024 訓練的，形狀必須一致才載得進。'],
+ ['NEW_CONFIG.update({"qkv_bias": True})','第 4 章埋的伏筆回收：原始 GPT-2 的 Q/K/V Linear <b>有 bias</b>。現代 LLM 多半不用（對效果沒幫助），但要用人家的權重，設定就得跟人家一致。'],
+ ['gpt = GPTModel(NEW_CONFIG); gpt.eval()','用新 config 蓋一個「形狀完全對齊 OpenAI 權重」的空模型，等著被填入。']];
+$("#ncLines").innerHTML=NC.map((c,i)=>`<div class="cl" data-i="${i}" style="cursor:pointer">${c[0]}</div>`).join("");
+$$("#ncLines .cl").forEach(el=>el.addEventListener("click",()=>{
+  const c=NC[+el.dataset.i];
+  $$("#ncLines .cl").forEach(x=>x.classList.remove("lit"));el.classList.add("lit");
+  $("#ncCap").innerHTML="<b>"+c[0].slice(0,42)+(c[0].length>42?"…":"")+"</b> — "+c[1];
+}));
+
+/* ===== 5.5 權重對應 explorer ===== */
+const WM=[
+[`<span class="lbl"># 兩張 embedding 查表，直接照搬</span>
+gpt.pos_emb.weight ← assign( params[<span class="tn">"wpe"</span>] )   <span class="lbl"># [1024, 768] 位置嵌入</span>
+gpt.tok_emb.weight ← assign( params[<span class="tn">"wte"</span>] )   <span class="lbl"># [50257, 768] token 嵌入</span>`,
+ "最單純的兩個：名字不同（wpe/wte vs pos_emb/tok_emb）但形狀一樣，assign() 檢查通過就直接覆蓋。"],
+[`<span class="lbl"># OpenAI 把 Q、K、V 三個矩陣「橫向拼在一起」存成一個 c_attn</span>
+params["blocks"][b]["attn"][<span class="tn">"c_attn"</span>]["w"]   <span class="lbl"># 形狀 [768, 2304] ＝ 768 × (3×768)</span>
+
+q_w, k_w, v_w = np.split(..., <span class="tn">3</span>, axis=-1)     <span class="lbl"># 切成三份，各 [768, 768]</span>
+gpt.trf_blocks[b].att.W_query.weight ← assign(q_w<span class="tn">.T</span>)   <span class="lbl"># 還要轉置！</span>
+gpt.trf_blocks[b].att.W_key.weight   ← assign(k_w<span class="tn">.T</span>)   <span class="lbl"># TF 與 PyTorch 的 Linear</span>
+gpt.trf_blocks[b].att.W_value.weight ← assign(v_w<span class="tn">.T</span>)   <span class="lbl"># 權重存放方向相反</span>
+<span class="lbl"># bias（"b"）同樣 split 成三份——這就是 qkv_bias=True 的原因</span>`,
+ "最容易出錯的一段：①要 np.split 切三份、②要 .T 轉置（TensorFlow 和 PyTorch 的 Linear 權重方向相反）、③bias 也要一起搬。任何一步漏掉，模型就開始說胡話。"],
+[`gpt.trf_blocks[b].att.out_proj.weight ← assign( params["blocks"][b]["attn"][<span class="tn">"c_proj"</span>]["w"].T )
+gpt.trf_blocks[b].att.out_proj.bias   ← assign( params["blocks"][b]["attn"]["c_proj"]["b"] )`,
+ "attention 的輸出投影：OpenAI 叫 c_proj，我們叫 out_proj——weight 轉置、bias 照搬。"],
+[`<span class="lbl"># FFN 的兩層 Linear（768→3072→768，第 4 章的「放大—收縮」）</span>
+gpt.trf_blocks[b].ff.layers[<span class="tn">0</span>] ← assign( params["blocks"][b]["mlp"][<span class="tn">"c_fc"</span>] )    <span class="lbl"># 768→3072</span>
+gpt.trf_blocks[b].ff.layers[<span class="tn">2</span>] ← assign( params["blocks"][b]["mlp"][<span class="tn">"c_proj"</span>] )  <span class="lbl"># 3072→768</span>
+<span class="lbl"># layers[1] 是 GELU——沒有權重，不用搬</span>`,
+ "OpenAI 把 FFN 叫 mlp：c_fc 是放大層、c_proj 是收縮層。中間的 GELU 是純函數、沒有參數。"],
+[`<span class="lbl"># 每個 block 兩個 LayerNorm 的 scale（g）與 shift（b）</span>
+gpt.trf_blocks[b].norm1.scale ← assign( params["blocks"][b][<span class="tn">"ln_1"</span>]["g"] )
+gpt.trf_blocks[b].norm1.shift ← assign( params["blocks"][b]["ln_1"]["b"] )
+gpt.trf_blocks[b].norm2.scale ← assign( params["blocks"][b][<span class="tn">"ln_2"</span>]["g"] )
+gpt.trf_blocks[b].norm2.shift ← assign( params["blocks"][b]["ln_2"]["b"] )`,
+ "LayerNorm 的可訓練參數：OpenAI 叫 g（gain）和 b（bias），對應我們的 scale 和 shift。第 4 章選 unbiased=False 的伏筆在此回收——算法一致，這些權重才能無縫接軌。"],
+[`gpt.final_norm.scale ← assign( params[<span class="tn">"g"</span>] )
+gpt.final_norm.shift ← assign( params[<span class="tn">"b"</span>] )
+gpt.out_head.weight  ← assign( params[<span class="tn">"wte"</span>] )   <span class="lbl"># ★ 和 tok_emb 用同一份權重！</span>`,
+ "<b>★ 第 4 章 weight tying 的伏筆回收</b>：原始 GPT-2 的輸出層直接重用 token embedding（wte 同時填進 tok_emb 和 out_head）——這也是官方參數量記為 124M 而不是 163M 的原因。"]];
+function renderWM(i){
+  $$("#wmChips .pill").forEach((b,bi)=>b.classList.toggle("on",bi===i));
+  $("#wmTsr").innerHTML=WM[i][0];$("#wmCap").innerHTML=WM[i][1];
+}
+$$("#wmChips .pill").forEach((b,i)=>b.addEventListener("click",()=>renderWM(i)));
+renderWM(0);
+
+/* ===== quiz ===== */
+const quiz=[
+ {q:"5.1 訓練時把 context_length 從 1024 改成 256，為什麼？",o:["模型架構要求","降低訓練的記憶體與運算需求，筆電才跑得動；架構不變，5.5 載入 OpenAI 權重時再調回 1024","256 效果比較好","tokenizer 的限制"],a:1,e:"純粹是算力考量：上下文變短，訓練成本大減。positional embedding 表跟著變短，但架構完全相同；載入 OpenAI 權重時因為 wpe 是 [1024, 768]，必須調回 1024。"},
+ {q:"cross entropy loss 的本質是什麼？",o:["預測值與答案的平方差","target token 機率的「負平均對數」：softmax 取 target 機率 → log → 平均 → 乘 −1","argmax 答對的比例","logits 的總和"],a:1,e:"六步推導：softmax → 挑 target 位置機率 → log → 平均 → 取負 = 10.7940。F.cross_entropy 一行全包。"},
+ {q:"未訓練模型的 loss 約 10.98，perplexity = exp(10.98) ≈ 詞彙表大小。這代表？",o:["模型壞了","模型等效在整個詞彙表 ~50257 個字之間亂猜——符合隨機權重的預期","資料有問題","loss 不能這樣算"],a:1,e:"純亂猜的理論 loss = ln(50257) ≈ 10.82。perplexity 把 loss 翻譯成「等效在幾個字裡猶豫」，未訓練時自然約等於整個詞彙表。"},
+ {q:"訓練 10 epoch 後 train loss 0.39、val loss 卡在 6.45，代表什麼？",o:["訓練失敗","learning rate 太小","模型 overfitting：把 5,145 個 token 的訓練集逐字背熟，但語言能力沒有等量進步","驗證集壞了"],a:2,e:"train/val 只在前兩輪一起下降；之後 train 續降是「背課文」——證據是第 9 輪逐字生成了《The Verdict》的原文片段。小資料多 epoch 的必然結果。"},
+ {q:"把 temperature 調到大於 1 會發生什麼事？",o:["分佈更尖、更保守","分佈被壓平、多樣性上升，但長尾怪字（如 pizza）也更容易被抽中","等同 argmax","停止生成"],a:1,e:"T>1 把 logits 差距壓小，softmax 後趨向均勻——T=5 時 pizza 約有 4% 機率。反之 T<1 分佈變尖，T→0 趨近 greedy。"},
+ {q:"top-k sampling 做的事是？",o:["只保留 logits 最高的 k 個字，其餘設 −∞（softmax 後機率為 0）再抽樣","把 loss 乘上 k","每 k 步評估一次","選第 k 高的字"],a:0,e:"用 torch.topk 找前 k 名、torch.where 把其他 logits 設 -inf——和第 3 章 causal mask 同一招。k=3 時只剩 forward/toward/closer 可抽。"},
+ {q:"載入 OpenAI 權重前，為什麼要把 qkv_bias 改成 True？",o:["PyTorch 的規定","bias 讓模型更準","原始 GPT-2 的 Q/K/V Linear 有 bias；設定不一致，權重的形狀就對不上、載不進去","為了省記憶體"],a:2,e:"我們預設 qkv_bias=False（現代做法），但 OpenAI 當年有 bias。用人家的權重就得遷就人家的設定——assign() 的形狀檢查會直接抓出這種不一致。"}];
+const qc=$("#quizBox");let ans=0,cor=0;
+quiz.forEach((it,qi)=>{const w=document.createElement("div");w.className="q";w.innerHTML=`<div class="qn">Q${qi+1} / ${quiz.length}</div><div class="qt">${it.q}</div>`;
+ it.o.forEach((o,oi)=>{const b=document.createElement("button");b.className="opt";b.innerHTML=o+'<span class="mk"></span>';
+  b.addEventListener("click",()=>{if(w.dataset.done)return;w.dataset.done=1;ans++;const ok=oi===it.a;if(ok)cor++;b.classList.add(ok?"correct":"wrong");b.querySelector(".mk").textContent=ok?"✓":"✗";if(!ok){const cb=w.querySelectorAll(".opt")[it.a];cb.classList.add("correct");cb.querySelector(".mk").textContent="✓";}w.querySelector(".exp").classList.add("show");if(ans===quiz.length)$("#score").textContent=`完成 ✓ 答對 ${cor} / ${quiz.length} 題`;});
+  w.appendChild(b);});
+ const ex=document.createElement("div");ex.className="exp";ex.textContent="▸ "+it.e;w.appendChild(ex);qc.appendChild(w);});
+
+/* 主題切換重繪 */
+new MutationObserver(()=>{drawTR();}).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{drawTR();});
+})();
+</script>
+</body>
+</html>
